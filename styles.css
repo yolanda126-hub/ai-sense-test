@@ -442,6 +442,7 @@ h1 { margin-bottom: 0; font-size: 34px; }
 .share-card .eyebrow { color: #d9ff8f; }
 .share-card h2 { margin-bottom: 12px; max-width: 760px; font-size: 64px; line-height: 1; color: #fff; }
 .share-card p { max-width: 720px; font-size: 22px; line-height: 1.55; color: rgba(255,255,255,.88); }
+.share-card .sync-note { margin: 12px 0 0; font-size: 15px; color: #d9ff8f; font-weight: 900; }
 .public-stats { display: flex; flex-wrap: wrap; gap: 8px; }
 .public-stats span { border: 3px solid #fff; background: rgba(255,255,255,.12); color: #fff; padding: 8px 12px; font-weight: 900; }
 .public-panel, .admin { margin-top: 18px; padding: 18px; }
@@ -470,10 +471,11 @@ body.recruiter-mode .internal-only { display: inline-block; }
 .verdict { display: grid; gap: 8px; padding: 14px; border: 3px solid #eff7ff; margin-bottom: 14px; }
 .verdict strong { font-size: 24px; }
 .verdict.yes { background: #1f5f43; } .verdict.caution { background: #7a5d1f; } .verdict.no { background: #7d2f34; }
-.metric-report, .badge-catalog, .company-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
-.metric-report div, .badge-catalog div, .company, .no-match, .evidence-row { border: 3px solid #eff7ff; padding: 10px; background: rgba(255,255,255,.08); }
-.metric-report span, .metric-report strong, .metric-report em, .badge-catalog strong, .badge-catalog span, .company strong, .company span, .company em { display: block; }
+.metric-report, .badge-catalog, .company-list, .feishu-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
+.metric-report div, .badge-catalog div, .company, .no-match, .evidence-row, .feishu-fields div { border: 3px solid #eff7ff; padding: 10px; background: rgba(255,255,255,.08); }
+.metric-report span, .metric-report strong, .metric-report em, .badge-catalog strong, .badge-catalog span, .company strong, .company span, .company em, .feishu-fields span, .feishu-fields strong { display: block; }
 .metric-report strong { font-size: 28px; }
+.feishu-fields strong { margin-top: 6px; color: #d9ff8f; line-height: 1.45; }
 .badge-catalog .active { background: rgba(63,198,157,.3); }
 .company { color: var(--ink); background: #fff; border-color: var(--line); }
 .company i { display: block; height: 14px; margin: 8px 0; border: 3px solid var(--line); background: #fff; }
@@ -497,7 +499,7 @@ body.recruiter-mode .internal-only { display: inline-block; }
 
 @media (max-width: 860px) {
   .topbar, .home.active, .avatar-stage, .map-layout, .challenge, .share-card { grid-template-columns: 1fr; }
-  .chip-grid, .metric-grid, .metric-report, .badge-catalog, .company-list { grid-template-columns: 1fr; }
+  .chip-grid, .metric-grid, .metric-report, .badge-catalog, .company-list, .feishu-fields { grid-template-columns: 1fr; }
   .home, .panel { padding: 18px; }
   .pixel-map { min-height: 760px; }
   .workshop.model { left: 6%; top: 13%; } .workshop.product { right: 6%; top: 39%; } .workshop.business { left: 14%; bottom: 8%; }

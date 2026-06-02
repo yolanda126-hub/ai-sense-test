@@ -14,6 +14,8 @@ const state = {
 const $ = (id) => document.getElementById(id);
 const RESULT_STORAGE_KEY = "aiSense.latestResult.v1";
 const RESULT_HISTORY_KEY = "aiSense.resultHistory.v1";
+const FEISHU_ENDPOINT = window.AI_SENSE_FEISHU_ENDPOINT || "";
+const FEISHU_AUTO_SUBMIT = window.AI_SENSE_FEISHU_AUTO_SUBMIT !== false;
 
 const calibrationTasks = [
   {
@@ -276,7 +278,8 @@ function snapshotState() {
     axes: { ...state.axes },
     scores: { ...state.scores },
     calibration: state.calibration.map((item) => ({ ...item })),
-    completed: Object.fromEntries(Object.entries(state.completed).map(([key, answers]) => [key, [...answers]]))
+    completed: Object.fromEntries(Object.entries(state.completed).map(([key, answers]) => [key, [...answers]])),
+    feishuRecord: buildFeishuRecord()
   };
 }
 
@@ -312,6 +315,79 @@ function saveResultSnapshot() {
     // Local storage may be unavailable in private browsing; the in-memory result still works.
   }
   return snapshot;
+}
+
+function recommendationLabel(level) {
+  if (level === "YES") return "值得推荐";
+  if (level === "CAUTION") return "谨慎推荐";
+  return "不推荐";
+}
+
+function roleRecommendations() {
+  const s = state.scores;
+  const roleScores = [
+    ["AI 产品经理 / Agent 产品经理", s.product + s.agent * 1.2],
+    ["模型评测 / AI 测评研究", s.model + s.research * 1.2],
+    ["AI 商业分析 / 战略研究", s.business + s.enterprise * 0.8],
+    ["企业 AI 解决方案 / 售前交付", s.enterprise + s.business * 0.8],
+    ["多模态内容产品 / AI 创作运营", s.content + s.product * 0.5],
+    ["AI 基础设施 / 推理工程 / 平台产品", s.infra + s.model * 0.5]
+  ];
+  return roleScores
+    .sort((a, b) => b[1] - a[1])
+    .filter(([, score]) => score > 0)
+    .slice(0, 3)
+    .map(([role]) => role);
+}
+
+function buildFeishuRecord() {
+  const badge = resolveBadge();
+  const status = recommendationStatus();
+  const m = metrics();
+  const matches = companyMatches();
+  const recommended = recommendationLabel(status.level);
+  const companiesText = status.level === "NO" ? "不推荐匹配公司" : matches.map((item) => `${item.name}(${item.fit}%)`).join("、");
+  const roles = status.level === "NO" ? ["暂不推荐岗位匹配"] : roleRecommendations();
+  return {
+    "是否值得推荐": recommended,
+    "推荐公司": companiesText || "暂无明确公司匹配",
+    "适合岗位": roles.join("、"),
+    "候选人编号": "",
+    "测评时间": new Date().toISOString(),
+    "AI Sense 身份": badge.name,
+    "身份代码": badge.code,
+    "筛选原因": status.reason,
+    "总分": m.total,
+    "校准均分": m.calibrationAvg,
+    "方向聚焦": `${m.focus}%`,
+    "严谨度": `${m.rigor}%`,
+    "模型轴": m.model,
+    "产品轴": m.product,
+    "商业轴": m.business,
+    "行为证据": Object.entries(state.completed).map(([key, answers]) => `${workshops[key].title}: ${answers.join(" / ")}`).join("\n")
+  };
+}
+
+async function submitFeishuRecord(snapshot) {
+  const note = $("feishuSyncNote");
+  if (!note) return;
+  const record = { ...(snapshot.feishuRecord || buildFeishuRecord()), "候选人编号": snapshot.id, "测评时间": snapshot.savedAt };
+  if (!FEISHU_ENDPOINT) {
+    note.textContent = "测试结果已生成。投递简历后，我们会结合结果一起查看。";
+    return;
+  }
+  note.textContent = "测试结果正在同步。";
+  try {
+    const response = await fetch(FEISHU_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fields: record, source: "ai-sense-test" })
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    note.textContent = "测试结果已同步。";
+  } catch {
+    note.textContent = "测试结果已生成，同步稍后重试。";
+  }
 }
 
 function loadLatestStoredResult() {
@@ -649,7 +725,7 @@ function companyMatches() {
 }
 
 function renderResults() {
-  saveResultSnapshot();
+  const snapshot = saveResultSnapshot();
   const badge = resolveBadge();
   const status = recommendationStatus();
   const m = metrics();
@@ -661,6 +737,7 @@ function renderResults() {
   renderAdmin(badge, status, m);
   updateHud();
   show("result");
+  if (FEISHU_AUTO_SUBMIT) submitFeishuRecord(snapshot);
 }
 
 function publicRank(level) {
@@ -691,6 +768,10 @@ function renderAdmin(badge, status, m) {
   $("companyMatches").innerHTML = matches.length
     ? matches.map((c) => `<div class="company"><strong>${c.name}</strong><span>${c.tags.map(tagName).join(" / ")}</span><i><b style="width:${c.fit}%"></b></i><em>${c.fit}%</em></div>`).join("")
     : `<div class="no-match">不推荐公司：当前分数未达到候选池最低线。</div>`;
+  const feishuRecord = buildFeishuRecord();
+  $("feishuFields").innerHTML = ["是否值得推荐", "推荐公司", "适合岗位"]
+    .map((key) => `<div><span>${key}</span><strong>${feishuRecord[key]}</strong></div>`)
+    .join("");
   $("badgeCatalog").innerHTML = badgeCatalog.map((item) => `<div class="${item.id === badge.id ? "active" : ""}"><strong>${item.name}</strong><span>${item.tagline}</span></div>`).join("");
   $("adminEvidence").innerHTML = Object.entries(state.completed).map(([key, answers]) => `<div class="evidence-row"><strong>${workshops[key].title}</strong><span>${answers.map((a, i) => `Q${i + 1} ${a}`).join(" / ")}</span></div>`).join("");
 }
@@ -705,6 +786,7 @@ function renderPendingAdmin() {
     ["身份勋章", "未生成", "完成后生成"]
   ].map(([k, v, line]) => `<div><span>${k}</span><strong>${v}</strong><em>${line}</em></div>`).join("");
   $("companyMatches").innerHTML = `<div class="no-match">暂无公司推荐：等待完整测试结果。</div>`;
+  $("feishuFields").innerHTML = `<div><span>是否值得推荐</span><strong>等待完整测试</strong></div><div><span>推荐公司</span><strong>等待完整测试</strong></div><div><span>适合岗位</span><strong>等待完整测试</strong></div>`;
   $("badgeCatalog").innerHTML = badgeCatalog.map((item) => `<div><strong>${item.name}</strong><span>${item.tagline}</span></div>`).join("");
   $("adminEvidence").innerHTML = `<div class="evidence-row"><strong>暂无行为证据</strong><span>完成探索点后自动记录每题选择。</span></div>`;
 }

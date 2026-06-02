@@ -149,7 +149,8 @@
             <p class="eyebrow">我的 AI Sense 身份</p>
             <h2 id="resultTitle"></h2>
             <p id="resultTagline"></p>
-            <div id="publicStats" class="public-stats"></div>
+          <div id="publicStats" class="public-stats"></div>
+            <p id="feishuSyncNote" class="sync-note"></p>
           </div>
         </div>
         <article class="public-panel">
@@ -192,6 +193,8 @@
           <div id="metricGrid" class="metric-report"></div>
           <h3>公司推荐</h3>
           <div id="companyMatches" class="company-list"></div>
+          <h3>飞书入表字段</h3>
+          <div id="feishuFields" class="feishu-fields"></div>
           <h3>所有可能勋章</h3>
           <div id="badgeCatalog" class="badge-catalog"></div>
           <h3>行为证据</h3>
@@ -199,6 +202,7 @@
         </article>
       </section>
     </main>
-    <script src="./app.js"></script>
+    <script src="./feishu-config.js?v=20260602" defer></script>
+    <script src="./app.js?v=feishu-20260602" defer></script>
   </body>
 </html>
