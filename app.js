@@ -12,6 +12,8 @@ const state = {
 };
 
 const $ = (id) => document.getElementById(id);
+const RESULT_STORAGE_KEY = "aiSense.latestResult.v1";
+const RESULT_HISTORY_KEY = "aiSense.resultHistory.v1";
 
 const calibrationTasks = [
   {
@@ -265,6 +267,60 @@ function reset() {
   state.workshopStep = 0;
   state.workshopAnswers = [];
   state.taskMeta = {};
+}
+
+function snapshotState() {
+  return {
+    id: `AIS-${Date.now().toString(36).toUpperCase()}`,
+    savedAt: new Date().toISOString(),
+    axes: { ...state.axes },
+    scores: { ...state.scores },
+    calibration: state.calibration.map((item) => ({ ...item })),
+    completed: Object.fromEntries(Object.entries(state.completed).map(([key, answers]) => [key, [...answers]]))
+  };
+}
+
+function restoreSnapshot(snapshot) {
+  if (!snapshot || !snapshot.completed || Object.keys(snapshot.completed).length !== 3) return false;
+  state.axes = { E: 0, I: 0, N: 0, S: 0, T: 0, F: 0, J: 0, P: 0, ...(snapshot.axes || {}) };
+  state.scores = { model: 0, product: 0, business: 0, research: 0, agent: 0, infra: 0, content: 0, enterprise: 0, ...(snapshot.scores || {}) };
+  state.calibration = Array.isArray(snapshot.calibration) ? snapshot.calibration : [];
+  state.completed = snapshot.completed;
+  state.step = calibrationTasks.length;
+  state.activeWorkshop = null;
+  state.workshopStep = 0;
+  state.workshopAnswers = [];
+  state.taskMeta = {};
+  return true;
+}
+
+function readStoredResults() {
+  try {
+    return JSON.parse(localStorage.getItem(RESULT_HISTORY_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function saveResultSnapshot() {
+  const snapshot = snapshotState();
+  try {
+    const history = [snapshot, ...readStoredResults().filter((item) => item.id !== snapshot.id)].slice(0, 20);
+    localStorage.setItem(RESULT_STORAGE_KEY, JSON.stringify(snapshot));
+    localStorage.setItem(RESULT_HISTORY_KEY, JSON.stringify(history));
+  } catch {
+    // Local storage may be unavailable in private browsing; the in-memory result still works.
+  }
+  return snapshot;
+}
+
+function loadLatestStoredResult() {
+  try {
+    const latest = JSON.parse(localStorage.getItem(RESULT_STORAGE_KEY) || "null");
+    return restoreSnapshot(latest) ? latest : null;
+  } catch {
+    return null;
+  }
 }
 
 function startCalibration() {
@@ -593,6 +649,7 @@ function companyMatches() {
 }
 
 function renderResults() {
+  saveResultSnapshot();
   const badge = resolveBadge();
   const status = recommendationStatus();
   const m = metrics();
@@ -613,6 +670,11 @@ function publicRank(level) {
 }
 
 function renderAdmin(badge, status, m) {
+  const latest = readStoredResults()[0];
+  const savedAt = latest ? new Date(latest.savedAt).toLocaleString("zh-CN", { hour12: false }) : "当前会话";
+  $("adminSource").textContent = latest
+    ? `数据来源：本机最新测试记录 ${latest.id}，保存于 ${savedAt}。静态网页暂不跨设备汇总。`
+    : "数据来源：当前测试会话。静态网页暂不跨设备汇总。";
   $("adminVerdict").className = `verdict ${status.level.toLowerCase()}`;
   $("adminVerdict").innerHTML = `<strong>${status.title}</strong><span>${status.reason}</span><em>${status.threshold}</em>`;
   const rows = [
@@ -634,6 +696,7 @@ function renderAdmin(badge, status, m) {
 }
 
 function renderPendingAdmin() {
+  $("adminSource").textContent = "暂无完整记录：请先让候选人在本浏览器完成一次测试，或接入表单/数据库做集中收集。";
   $("adminVerdict").className = "verdict caution";
   $("adminVerdict").innerHTML = "<strong>等待候选人完成测试</strong><span>当前还没有完整结果。候选人完成 4 道角色题和 3 个探索点后，这里会生成筛选结论。</span><em>进度要求：3 / 3 个探索点完成。</em>";
   $("metricGrid").innerHTML = [
@@ -647,6 +710,7 @@ function renderPendingAdmin() {
 }
 
 function openRecruiterView() {
+  if (Object.keys(state.completed).length !== 3) loadLatestStoredResult();
   if (Object.keys(state.completed).length === 3) {
     renderAdmin(resolveBadge(), recommendationStatus(), metrics());
     $("backResultBtn").textContent = "返回身份卡";
