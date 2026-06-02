@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="一个像素风 AI Sense 测试小游戏，用 MBTI 短题与 AI 探索点生成候选人的 AI 身份勋章。" />
+    <meta property="og:title" content="AI Sense 测试" />
+    <meta property="og:description" content="4 道短题生成像素角色，完成 3 个 AI 探索点，拿到你的 AI Sense 身份勋章。" />
+    <meta property="og:type" content="website" />
+    <title>AI Sense 测试</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=Press+Start+2P&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css?v=responsive-20260601" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="topbar">
+        <div class="brand">
+          <span class="logo"></span>
+          <div>
+            <p>AI Sense Arcade</p>
+            <h1>AI Sense 测试</h1>
+          </div>
+        </div>
+        <div class="hud">
+          <div><span>角色</span><strong id="hudRole">未生成</strong></div>
+          <div><span>勋章</span><strong id="hudBadge">未获得</strong></div>
+          <div><span>进度</span><strong id="hudProgress">0 / 3</strong></div>
+        </div>
+        <button class="ghost internal-only recruiter-top" id="openRecruiterTopBtn">招聘方后台</button>
+      </header>
+
+      <section id="home" class="screen active home">
+        <div class="home-copy">
+          <p class="eyebrow">AI Sense Test</p>
+          <h2>测测你的 AI 直觉有多快。</h2>
+          <p>先用 4 道短题生成你的像素角色，再解锁 3 个 AI 探索点，拿到最终身份勋章。</p>
+          <div class="actions">
+            <button class="primary" id="startBtn">开始测试</button>
+          </div>
+        </div>
+        <div class="pixel-preview" aria-hidden="true">
+          <div class="preview-board">
+            <span></span><span></span><span></span><span></span>
+            <span></span><span class="player-dot"></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span>
+          </div>
+          <div class="preview-label">
+            <span>SENSE CHIP</span>
+            <strong>FAST</strong>
+            <em>反应 / 识别 / 判断</em>
+          </div>
+        </div>
+      </section>
+
+      <section id="calibration" class="screen panel">
+        <div class="progress">
+          <span id="quizStep">01 / 04</span>
+          <div><i id="quizBar"></i></div>
+        </div>
+        <article class="question">
+          <p class="eyebrow">角色芯片校准</p>
+          <h2 id="questionTitle"></h2>
+          <div id="questionBody" class="question-body"></div>
+        </article>
+      </section>
+
+      <section id="avatar" class="screen panel">
+        <div class="avatar-stage">
+          <div id="avatarSprite" class="avatar-sprite explorer">
+            <span class="hair"></span><span class="face"></span><span class="body"></span><span class="legs"></span>
+          </div>
+          <div>
+            <p class="eyebrow">角色生成完成</p>
+            <h2 id="avatarName">AI 测试者</h2>
+            <p id="avatarBio"></p>
+            <div id="avatarTraits" class="chips"></div>
+            <button class="primary" id="enterMapBtn">进入 AI 探索地图</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="map" class="screen">
+        <div class="map-layout">
+          <aside class="side-card">
+            <div class="mini-stage">
+              <div id="miniAvatar" class="avatar-sprite small explorer">
+                <span class="hair"></span><span class="face"></span><span class="body"></span><span class="legs"></span>
+              </div>
+            </div>
+            <h2 id="playerName">AI 测试者</h2>
+            <p id="playerBio">完成校准后解锁角色说明。</p>
+            <div class="status">
+              <div><span>模型观测塔</span><strong id="modelStatus">待解锁</strong></div>
+              <div><span>Agent 控制舱</span><strong id="productStatus">待解锁</strong></div>
+              <div><span>商业罗盘站</span><strong id="businessStatus">待解锁</strong></div>
+            </div>
+          </aside>
+          <div class="pixel-map">
+            <div class="river"></div>
+            <div class="path p1"></div><div class="path p2"></div><div class="path p3"></div>
+            <div class="tree t1"></div><div class="tree t2"></div><div class="lab l1"></div><div class="lab l2"></div>
+            <div id="walker" class="walker explorer"><span></span><b></b><i></i></div>
+            <button class="workshop model" data-workshop="model">
+              <span class="chimney"></span><span class="roof"></span><span class="attic"></span>
+              <span class="window left"></span><span class="window right"></span><span class="door"></span>
+              <strong>模型观测塔</strong><em id="modelState">进入</em>
+            </button>
+            <button class="workshop product" data-workshop="product">
+              <span class="chimney"></span><span class="roof"></span><span class="attic"></span>
+              <span class="window left"></span><span class="window right"></span><span class="door"></span>
+              <strong>Agent 控制舱</strong><em id="productState">进入</em>
+            </button>
+            <button class="workshop business" data-workshop="business">
+              <span class="chimney"></span><span class="roof"></span><span class="attic"></span>
+              <span class="window left"></span><span class="window right"></span><span class="door"></span>
+              <strong>商业罗盘站</strong><em id="businessState">进入</em>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section id="workshop" class="screen panel">
+        <div class="workshop-head">
+          <button class="icon" id="backMapBtn" aria-label="返回地图">←</button>
+          <div>
+            <p class="eyebrow" id="workshopKicker">挑战任务</p>
+            <h2 id="workshopTitle"></h2>
+          </div>
+        </div>
+        <div class="challenge">
+          <article class="mission">
+            <div id="missionEvidence" class="evidence"></div>
+            <p id="missionBrief"></p>
+            <div id="missionOptions" class="options"></div>
+          </article>
+          <aside class="terminal">
+            <div>SENSE CHIP</div>
+            <p id="missionFeedback">完成当前探索点后点亮碎片。</p>
+          </aside>
+        </div>
+      </section>
+
+      <section id="result" class="screen panel result">
+        <div id="shareCard" class="share-card">
+          <div class="medal" id="finalMedal">AI</div>
+          <div>
+            <p class="eyebrow">我的 AI Sense 身份</p>
+            <h2 id="resultTitle"></h2>
+            <p id="resultTagline"></p>
+            <div id="publicStats" class="public-stats"></div>
+          </div>
+        </div>
+        <article class="public-panel">
+          <h3>可分享文案</h3>
+          <p id="shareText"></p>
+        </article>
+        <article class="public-panel resume-panel">
+          <div>
+            <p class="eyebrow">AI Sense Talent</p>
+            <h3>我们也在收集有 AI Sense 的简历</h3>
+            <p>如果你对 AI 产品、模型评测、Agent、AI 公司研究或商业落地感兴趣，可以投递简历给我们。</p>
+          </div>
+          <label class="resume-upload">
+            <span>选择简历附件</span>
+            <input id="resumeFile" type="file" accept=".pdf,.doc,.docx,.txt" />
+          </label>
+          <p id="resumeNote" class="resume-note">支持 PDF / Word。静态演示版会先记录文件名，正式发布时可接入飞书表单或招聘邮箱。</p>
+          <a class="primary resume-link" id="resumeMailLink" href="mailto:talent@example.com?subject=AI%20Sense%20%E7%AE%80%E5%8E%86%E6%8A%95%E9%80%92">发送投递邮件</a>
+        </article>
+        <div class="actions">
+          <button class="primary" id="restartBtn">重新开始</button>
+          <button class="ghost" id="copyShareBtn">复制分享文案</button>
+          <button class="ghost internal-only" id="openRecruiterBtn">招聘方视图</button>
+        </div>
+      </section>
+
+      <section id="recruiter" class="screen panel recruiter-screen">
+        <div class="recruiter-head">
+          <div>
+            <p class="eyebrow">Recruiter Console</p>
+            <h2>AI Sense 招聘方画像</h2>
+          </div>
+          <button class="ghost" id="backResultBtn">返回身份卡</button>
+        </div>
+        <article class="admin">
+          <h3>筛选结论</h3>
+          <div id="adminVerdict" class="verdict"></div>
+          <h3>核心指标</h3>
+          <div id="metricGrid" class="metric-report"></div>
+          <h3>公司推荐</h3>
+          <div id="companyMatches" class="company-list"></div>
+          <h3>所有可能勋章</h3>
+          <div id="badgeCatalog" class="badge-catalog"></div>
+          <h3>行为证据</h3>
+          <div id="adminEvidence"></div>
+        </article>
+      </section>
+    </main>
+    <script src="./app.js"></script>
+  </body>
+</html>
