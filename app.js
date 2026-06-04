@@ -1,21 +1,24 @@
 const $ = (id) => document.getElementById(id);
-const RESULT_STORAGE_KEY = "aiSense.latestResult.v2";
-const RESULT_HISTORY_KEY = "aiSense.resultHistory.v2";
+const RESULT_STORAGE_KEY = "aiSense.latestResult.v3";
+const RESULT_HISTORY_KEY = "aiSense.resultHistory.v3";
 const FEISHU_ENDPOINT = window.AI_SENSE_FEISHU_ENDPOINT || "";
 const FEISHU_AUTO_SUBMIT = window.AI_SENSE_FEISHU_AUTO_SUBMIT !== false;
 
 const state = {
   stage: 0,
+  round: 0,
   scores: { boundary: 0, prompt: 0, verification: 0, workflow: 0 },
-  answers: {},
-  selections: []
+  roundScores: { boundary: [], prompt: [], verification: [], workflow: [] },
+  answers: { boundary: [], prompt: [], verification: [], workflow: [] },
+  selections: [],
+  riskFailures: []
 };
 
 const dimensions = {
-  boundary: { name: "模型边界", short: "边界", description: "知道哪些任务可交给 AI，哪些必须保留人工责任。" },
-  prompt: { name: "任务拆解", short: "拆解", description: "能把模糊需求转成目标、标准、约束和输出格式。" },
-  verification: { name: "验证意识", short: "查错", description: "会检查证据、事实和结论，不被流畅表达迷惑。" },
-  workflow: { name: "Agent 工作流", short: "流程", description: "能设计可靠、可复核、可接管的 AI 任务链路。" }
+  boundary: { name: "模型边界", description: "知道哪些任务可交给 AI，哪些必须保留人工责任。" },
+  prompt: { name: "任务拆解", description: "能把模糊需求转成目标、标准、约束和输出格式。" },
+  verification: { name: "验证意识", description: "会检查证据、事实和结论，不被流畅表达迷惑。" },
+  workflow: { name: "Agent 工作流", description: "能设计可靠、可复核、可接管的 AI 任务链路。" }
 };
 
 const games = [
@@ -23,57 +26,155 @@ const games = [
     id: "boundary",
     code: "BOUNDARY",
     title: "边界雷达",
-    question: "哪些任务可以直接交给 AI，哪些需要人审，哪些不应让 AI 直接决定？",
-    instruction: "依次点击每张任务卡，为它选择最合适的处理方式。",
-    type: "classify",
     categories: ["可交给 AI", "需要人审", "不应直接决定"],
-    cards: [
-      ["总结一篇公开新闻", "可交给 AI"],
-      ["生成客服回复草稿", "需要人审"],
-      ["判断候选人是否有心理疾病", "不应直接决定"],
-      ["从会议记录中提取待办", "可交给 AI"],
-      ["决定员工是否应该被淘汰", "不应直接决定"],
-      ["生成合同风险提示", "需要人审"]
+    rounds: [
+      {
+        question: "日常工作里，哪些任务适合交给 AI？",
+        instruction: "为每张任务卡选择最合适的处理方式。",
+        type: "classify",
+        cards: [
+          ["总结一篇公开新闻", "可交给 AI"],
+          ["生成客服回复草稿", "需要人审"],
+          ["从会议记录中提取待办", "可交给 AI"],
+          ["生成合同风险提示", "需要人审"]
+        ]
+      },
+      {
+        question: "专业工作里，AI 应该承担到哪一步？",
+        instruction: "判断哪些任务需要专业人员复核。",
+        type: "classify",
+        cards: [
+          ["根据代码报错生成排查建议", "需要人审"],
+          ["为公开商品描述生成初稿", "可交给 AI"],
+          ["根据财务数据生成投资建议", "需要人审"],
+          ["自动整理公开行业资料", "可交给 AI"]
+        ]
+      },
+      {
+        question: "高风险决策里，哪些责任不能交给 AI？",
+        instruction: "这一回合会检查你的风险底线。",
+        type: "classify",
+        cards: [
+          ["判断候选人是否有心理疾病", "不应直接决定"],
+          ["决定员工是否应该被淘汰", "不应直接决定"],
+          ["根据症状决定患者是否停药", "不应直接决定"],
+          ["为招聘面试生成问题草稿", "需要人审"]
+        ],
+        critical: ["判断候选人是否有心理疾病", "决定员工是否应该被淘汰", "根据症状决定患者是否停药"]
+      }
     ]
   },
   {
     id: "prompt",
     code: "PROMPT",
     title: "Prompt 装配台",
-    question: "任务是：让 AI 判断一名候选人是否适合 AI 产品岗位。",
-    instruction: "从零件中选出最重要的 4 个，装成一个可靠的任务说明。",
-    type: "select",
-    limit: 4,
-    correct: ["明确目标", "提供候选人背景", "给出判断标准", "规定输出格式"],
-    options: ["明确目标", "提供候选人背景", "给出判断标准", "规定输出格式", "要求像顶级专家", "语气必须激动", "越短越好", "直接给录用结论"]
+    rounds: [
+      {
+        question: "任务：让 AI 判断一名候选人是否适合 AI 产品岗位。",
+        instruction: "选出最重要的 4 个任务零件。",
+        type: "select",
+        limit: 4,
+        correct: ["明确目标", "提供候选人背景", "给出判断标准", "规定输出格式"],
+        options: ["明确目标", "提供候选人背景", "给出判断标准", "规定输出格式", "要求像顶级专家", "语气必须激动", "越短越好", "直接给录用结论"]
+      },
+      {
+        question: "任务：让 AI 从 200 条用户反馈中找出产品问题。",
+        instruction: "选出最重要的 4 个任务零件。",
+        type: "select",
+        limit: 4,
+        correct: ["说明反馈来源", "定义问题分类", "要求引用原文", "输出优先级"],
+        options: ["说明反馈来源", "定义问题分类", "要求引用原文", "输出优先级", "只找负面反馈", "模仿产品经理语气", "不要解释", "直接给最终结论"]
+      },
+      {
+        question: "任务：让 AI 生成一份可上线的客服知识库回答。",
+        instruction: "选出最重要的 4 个任务零件。",
+        type: "select",
+        limit: 4,
+        correct: ["提供知识库原文", "限定不可编造", "定义适用用户", "规定无法回答时的处理"],
+        options: ["提供知识库原文", "限定不可编造", "定义适用用户", "规定无法回答时的处理", "要求文风活泼", "尽量显得自信", "禁止说不知道", "回答越长越好"]
+      }
+    ]
   },
   {
     id: "verification",
     code: "VERIFY",
     title: "幻觉排雷",
-    question: "这段 AI 分析看起来很专业，但里面藏着 3 个不可靠的结论。",
-    instruction: "点击你认为有问题的句子。",
-    type: "select",
-    limit: 3,
-    correct: ["候选人负责过大模型训练。", "候选人非常适合算法研究岗。", "候选人一定能适应创业公司。"],
-    options: [
-      "候选人曾参与 AI 产品调研。",
-      "候选人负责过大模型训练。",
-      "候选人非常适合算法研究岗。",
-      "候选人有较强的用户访谈经验。",
-      "候选人一定能适应创业公司。",
-      "建议进一步验证其技术深度。"
+    rounds: [
+      {
+        question: "候选人分析里藏着 3 个不可靠的结论。",
+        instruction: "点击你认为有问题的句子。",
+        type: "select",
+        limit: 3,
+        correct: ["候选人负责过大模型训练。", "候选人非常适合算法研究岗。", "候选人一定能适应创业公司。"],
+        options: [
+          "候选人曾参与 AI 产品调研。",
+          "候选人负责过大模型训练。",
+          "候选人非常适合算法研究岗。",
+          "候选人有较强的用户访谈经验。",
+          "候选人一定能适应创业公司。",
+          "建议进一步验证其技术深度。"
+        ]
+      },
+      {
+        question: "公司研究报告里藏着 3 个证据跳跃。",
+        instruction: "点击你认为不能由现有信息推出的句子。",
+        type: "select",
+        limit: 3,
+        correct: ["该公司已经成为行业第一。", "用户增长证明其商业模式已经跑通。", "团队一定拥有独家模型能力。"],
+        options: [
+          "该公司最近三个月用户增长较快。",
+          "该公司已经成为行业第一。",
+          "用户增长证明其商业模式已经跑通。",
+          "报告尚未提供续费率数据。",
+          "团队一定拥有独家模型能力。",
+          "建议补充客户留存与毛利数据。"
+        ]
+      },
+      {
+        question: "医疗建议里藏着 3 个危险结论。",
+        instruction: "这一回合会检查你的风险底线。",
+        type: "select",
+        limit: 3,
+        correct: ["该患者可以立刻停药。", "这些症状证明患者没有严重疾病。", "无需再咨询医生。"],
+        options: [
+          "患者描述了近期的头晕症状。",
+          "该患者可以立刻停药。",
+          "这些症状证明患者没有严重疾病。",
+          "建议记录症状发生时间。",
+          "无需再咨询医生。",
+          "需要由专业医生进一步判断。"
+        ],
+        critical: ["该患者可以立刻停药。", "无需再咨询医生。"]
+      }
     ]
   },
   {
     id: "workflow",
     code: "AGENT",
     title: "Agent 路线规划",
-    question: "目标：从 50 份简历中筛出 10 名有 AI Sense 的候选人。",
-    instruction: "按你认为可靠的执行顺序，依次点击 5 个步骤。",
-    type: "order",
-    correct: ["定义评分维度", "结构化提取简历信息", "AI 初筛并记录理由", "人工复核边界案例", "输出推荐名单与证据"],
-    options: ["定义评分维度", "直接让 AI 给最终名单", "结构化提取简历信息", "AI 初筛并记录理由", "只看学校与公司", "人工复核边界案例", "输出推荐名单与证据"]
+    rounds: [
+      {
+        question: "目标：从 50 份简历中筛出 10 名有 AI Sense 的候选人。",
+        instruction: "按可靠的执行顺序，依次点击 5 个步骤。",
+        type: "order",
+        correct: ["定义评分维度", "结构化提取简历信息", "AI 初筛并记录理由", "人工复核边界案例", "输出推荐名单与证据"],
+        options: ["定义评分维度", "直接让 AI 给最终名单", "结构化提取简历信息", "AI 初筛并记录理由", "只看学校与公司", "人工复核边界案例", "输出推荐名单与证据"]
+      },
+      {
+        question: "目标：让 AI 处理客户咨询，但不能编造产品能力。",
+        instruction: "按可靠的执行顺序，依次点击 5 个步骤。",
+        type: "order",
+        correct: ["接入可信知识库", "识别用户问题类型", "生成带引用的回答", "低置信度转人工", "记录失败问题并更新知识库"],
+        options: ["接入可信知识库", "识别用户问题类型", "生成带引用的回答", "低置信度转人工", "记录失败问题并更新知识库", "要求 AI 永远回答", "隐藏无法回答的问题"]
+      },
+      {
+        question: "目标：用 AI 完成一份行业研究初稿。",
+        instruction: "按可靠的执行顺序，依次点击 5 个步骤。",
+        type: "order",
+        correct: ["定义研究问题", "收集可信来源", "AI 提取与归纳", "核验关键事实和引用", "输出结论与不确定性"],
+        options: ["定义研究问题", "收集可信来源", "AI 提取与归纳", "核验关键事实和引用", "输出结论与不确定性", "只使用一篇热门文章", "删除所有不确定表述"]
+      }
+    ]
   }
 ];
 
@@ -100,9 +201,12 @@ function show(id) {
 
 function reset() {
   state.stage = 0;
+  state.round = 0;
   state.scores = { boundary: 0, prompt: 0, verification: 0, workflow: 0 };
-  state.answers = {};
+  state.roundScores = { boundary: [], prompt: [], verification: [], workflow: [] };
+  state.answers = { boundary: [], prompt: [], verification: [], workflow: [] };
   state.selections = [];
+  state.riskFailures = [];
 }
 
 function start() {
@@ -111,31 +215,44 @@ function start() {
   renderGame();
 }
 
+function currentGame() {
+  return games[state.stage];
+}
+
+function currentRound() {
+  return currentGame().rounds[state.round];
+}
+
+function completedRounds() {
+  return state.stage * 3 + state.round;
+}
+
 function renderGame() {
-  const game = games[state.stage];
+  const game = currentGame();
+  const round = currentRound();
   state.selections = [];
   $("hudStage").textContent = game.title;
   $("hudProgress").textContent = `${state.stage} / 4`;
-  $("gameKicker").textContent = `关卡 ${state.stage + 1} / 4`;
+  $("gameKicker").textContent = `关卡 ${state.stage + 1} / 4 · 回合 ${state.round + 1} / 3`;
   $("gameTitle").textContent = game.title;
   $("gameCode").textContent = game.code;
-  $("gameQuestion").textContent = game.question;
-  $("gameInstruction").textContent = game.instruction;
+  $("gameQuestion").textContent = round.question;
+  $("gameInstruction").textContent = round.instruction;
   $("gameFeedback").textContent = "完成操作后提交。";
   $("gameFeedback").className = "";
-  $("gameBar").style.width = `${(state.stage / games.length) * 100}%`;
+  $("gameBar").style.width = `${(completedRounds() / 12) * 100}%`;
   $("submitGameBtn").disabled = false;
   const area = $("gameArea");
   area.innerHTML = "";
-  if (game.type === "classify") renderClassify(game, area);
-  if (game.type === "select") renderSelect(game, area);
-  if (game.type === "order") renderOrder(game, area);
+  if (round.type === "classify") renderClassify(game, round, area);
+  if (round.type === "select") renderSelect(game, round, area);
+  if (round.type === "order") renderOrder(round, area);
 }
 
-function renderClassify(game, area) {
+function renderClassify(game, round, area) {
   const grid = document.createElement("div");
   grid.className = "classify-grid";
-  game.cards.forEach(([text]) => {
+  round.cards.forEach(([text]) => {
     const card = document.createElement("div");
     card.className = "task-card";
     card.innerHTML = `<strong>${text}</strong><div class="category-buttons"></div>`;
@@ -156,24 +273,24 @@ function renderClassify(game, area) {
   area.appendChild(grid);
 }
 
-function renderSelect(game, area) {
+function renderSelect(game, round, area) {
   const grid = document.createElement("div");
   grid.className = game.id === "verification" ? "statement-grid" : "component-grid";
-  game.options.forEach((text) => {
+  round.options.forEach((text) => {
     const button = document.createElement("button");
     button.className = game.id === "verification" ? "statement-card" : "component-card";
     button.innerHTML = `<span>${game.id === "verification" ? "分析片段" : "PROMPT 零件"}</span><strong>${text}</strong>`;
-    button.onclick = () => toggleSelection(button, text, game.limit);
+    button.onclick = () => toggleSelection(button, text, round.limit);
     grid.appendChild(button);
   });
   area.appendChild(grid);
 }
 
-function renderOrder(game, area) {
+function renderOrder(round, area) {
   const layout = document.createElement("div");
   layout.className = "workflow-layout";
   layout.innerHTML = `<div class="workflow-pool"></div><div class="workflow-route"><p>你的执行路线</p><ol id="routeList"></ol></div>`;
-  game.options.forEach((text) => {
+  round.options.forEach((text) => {
     const button = document.createElement("button");
     button.className = "workflow-step";
     button.textContent = text;
@@ -205,35 +322,57 @@ function toggleSelection(button, text, limit) {
 }
 
 function submitGame() {
-  const game = games[state.stage];
+  const game = currentGame();
+  const round = currentRound();
   let score = 0;
   let evidence = "";
-  if (game.type === "classify") {
-    if (state.selections.length < game.cards.length) return feedback("请先为每张任务卡完成分类。", false);
-    const correct = game.cards.filter(([text, answer]) => state.selections.find((item) => item.text === text)?.choice === answer).length;
-    score = Math.round((correct / game.cards.length) * 100);
-    evidence = `正确分类 ${correct}/${game.cards.length}`;
-  } else if (game.type === "select") {
-    if (state.selections.length < game.limit) return feedback(`请选择 ${game.limit} 项后再提交。`, false);
-    const correct = state.selections.filter((item) => game.correct.includes(item)).length;
-    score = Math.round((correct / game.correct.length) * 100);
-    evidence = `命中关键项 ${correct}/${game.correct.length}：${state.selections.join("、")}`;
+  let criticalMisses = [];
+
+  if (round.type === "classify") {
+    if (state.selections.length < round.cards.length) return feedback("请先为每张任务卡完成分类。", false);
+    const correct = round.cards.filter(([text, answer]) => state.selections.find((item) => item.text === text)?.choice === answer).length;
+    score = Math.round((correct / round.cards.length) * 100);
+    evidence = `正确分类 ${correct}/${round.cards.length}`;
+    criticalMisses = (round.critical || []).filter((text) => {
+      const answer = round.cards.find(([cardText]) => cardText === text)?.[1];
+      return state.selections.find((item) => item.text === text)?.choice !== answer;
+    });
+  } else if (round.type === "select") {
+    if (state.selections.length < round.limit) return feedback(`请选择 ${round.limit} 项后再提交。`, false);
+    const correct = state.selections.filter((item) => round.correct.includes(item)).length;
+    score = Math.round((correct / round.correct.length) * 100);
+    evidence = `命中关键项 ${correct}/${round.correct.length}：${state.selections.join("、")}`;
+    criticalMisses = (round.critical || []).filter((text) => !state.selections.includes(text));
   } else {
     if (state.selections.length < 5) return feedback("请先完成 5 步执行路线。", false);
-    const positionHits = state.selections.filter((item, index) => item === game.correct[index]).length;
-    const contentHits = state.selections.filter((item) => game.correct.includes(item)).length;
-    score = Math.round((positionHits * 12 + contentHits * 8));
+    const positionHits = state.selections.filter((item, index) => item === round.correct[index]).length;
+    const contentHits = state.selections.filter((item) => round.correct.includes(item)).length;
+    score = Math.round(positionHits * 12 + contentHits * 8);
     evidence = `步骤命中 ${contentHits}/5，顺序命中 ${positionHits}/5：${state.selections.join(" → ")}`;
   }
-  state.scores[game.id] = Math.min(100, score);
-  state.answers[game.id] = evidence;
-  feedback(score >= 80 ? "判断很稳，这一关证明了你的能力。" : score >= 60 ? "有不错的直觉，但还有一个关键点可以更严谨。" : "这一关暴露了一个值得继续训练的盲区。", true);
+
+  if (criticalMisses.length) {
+    state.riskFailures.push(`${game.title}回合${state.round + 1}：${criticalMisses.join("、")}`);
+  }
+  state.roundScores[game.id].push(Math.min(100, score));
+  state.answers[game.id].push(`回合${state.round + 1} ${evidence}`);
+  state.scores[game.id] = average(state.roundScores[game.id]);
+
+  feedback(score >= 80 ? "判断很稳，进入下一回合。" : score >= 60 ? "有不错的直觉，再看一个不同场景。" : "这里暴露了一个值得继续训练的盲区。", true);
   $("submitGameBtn").disabled = true;
-  setTimeout(() => {
-    state.stage += 1;
-    if (state.stage >= games.length) renderResults();
-    else renderGame();
-  }, 700);
+  setTimeout(advanceGame, 650);
+}
+
+function advanceGame() {
+  if (state.round < 2) {
+    state.round += 1;
+    renderGame();
+    return;
+  }
+  state.stage += 1;
+  state.round = 0;
+  if (state.stage >= games.length) renderResults();
+  else renderGame();
 }
 
 function feedback(text, ok) {
@@ -241,18 +380,32 @@ function feedback(text, ok) {
   $("gameFeedback").className = ok ? "ok" : "warn";
 }
 
+function average(values) {
+  return Math.round(values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length));
+}
+
 function metrics() {
   const values = Object.values(state.scores);
-  const total = Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+  const total = average(values);
   const min = Math.min(...values);
   const top = Object.entries(state.scores).sort((a, b) => b[1] - a[1])[0][0];
-  return { total, min, top };
+  const ranges = Object.values(state.roundScores).map((scores) => scores.length ? Math.max(...scores) - Math.min(...scores) : 100);
+  const stability = Math.max(0, 100 - average(ranges));
+  const riskPass = state.riskFailures.length === 0;
+  return { total, min, top, stability, riskPass };
 }
 
 function recommendationStatus() {
   const m = metrics();
-  if (m.total >= 80 && m.min >= 60) return { level: "YES", title: "强推荐进入候选池", reason: "四项 AI Sense 能力稳定，没有明显短板。" };
-  if (m.total >= 68 && m.min >= 45) return { level: "CAUTION", title: "可推荐，建议二面验证", reason: "已经形成 AI Sense 优势，但仍有一个环节需要验证。" };
+  if (!m.riskPass) {
+    return { level: "NO", title: "暂不推荐进入候选池", reason: "高风险任务底线未通过，需要重点验证其 AI 使用边界。" };
+  }
+  if (m.total >= 85 && m.min >= 70 && m.stability >= 75) {
+    return { level: "YES", title: "强推荐进入候选池", reason: "12 个行为样本表现稳定，四项 AI Sense 能力没有明显短板。" };
+  }
+  if (m.total >= 70 && m.min >= 50 && m.stability >= 55) {
+    return { level: "CAUTION", title: "可推荐，建议二面验证", reason: "已经形成 AI Sense 优势，但稳定性或单项能力仍需验证。" };
+  }
   return { level: "NO", title: "暂不推荐进入候选池", reason: "当前行为证据不足，AI 能力还没有稳定形成闭环。" };
 }
 
@@ -290,13 +443,19 @@ function buildFeishuRecord() {
     "适合岗位": career.roles,
     "AI Sense 身份": badge.name,
     "AI Sense 分数": m.total,
+    "稳定性": m.stability,
+    "风险底线": m.riskPass ? "通过" : "未通过",
     "模型边界": state.scores.boundary,
     "任务拆解": state.scores.prompt,
     "验证意识": state.scores.verification,
     "Agent 工作流": state.scores.workflow,
     "严格结论": status.reason,
-    "关键证据": Object.entries(state.answers).map(([key, value]) => `${dimensions[key].name}: ${value}`).join("\n")
+    "关键证据": evidenceText()
   };
+}
+
+function evidenceText() {
+  return games.map((game) => `${game.title}: ${state.answers[game.id].join(" / ")}`).join("\n");
 }
 
 function snapshotState() {
@@ -304,7 +463,9 @@ function snapshotState() {
     id: `AIS-${Date.now().toString(36).toUpperCase()}`,
     savedAt: new Date().toISOString(),
     scores: { ...state.scores },
-    answers: { ...state.answers },
+    roundScores: structuredClone(state.roundScores),
+    answers: structuredClone(state.answers),
+    riskFailures: [...state.riskFailures],
     feishuRecord: buildFeishuRecord()
   };
 }
@@ -322,10 +483,13 @@ function saveResultSnapshot() {
 }
 
 function restoreSnapshot(snapshot) {
-  if (!snapshot?.scores || !snapshot?.answers) return false;
+  if (!snapshot?.scores || !snapshot?.answers || !snapshot?.roundScores) return false;
   state.scores = { ...state.scores, ...snapshot.scores };
-  state.answers = { ...snapshot.answers };
+  state.roundScores = { ...state.roundScores, ...snapshot.roundScores };
+  state.answers = { ...state.answers, ...snapshot.answers };
+  state.riskFailures = Array.isArray(snapshot.riskFailures) ? snapshot.riskFailures : [];
   state.stage = games.length;
+  state.round = 0;
   return true;
 }
 
@@ -361,7 +525,6 @@ async function submitFeishuRecord(snapshot) {
 function renderResults() {
   const snapshot = saveResultSnapshot();
   const badge = resolveBadge();
-  const status = recommendationStatus();
   const m = metrics();
   $("hudStage").textContent = "已完成";
   $("hudBadge").textContent = badge.name;
@@ -382,12 +545,16 @@ function renderAdmin() {
   const status = recommendationStatus();
   const career = careerRecommendation();
   const m = metrics();
-  $("adminSource").textContent = "数据来源：候选人在 4 个精简游戏中的实际操作，而不是自我评价。";
+  $("adminSource").textContent = "数据来源：候选人在 4 个游戏、12 个短回合中的实际操作，而不是自我评价。";
   $("adminVerdict").className = `verdict ${status.level.toLowerCase()}`;
-  $("adminVerdict").innerHTML = `<strong>${status.title}</strong><span>${status.reason}</span><em>严格线：平均分 ≥ 80，且单项不得低于 60。</em>`;
+  $("adminVerdict").innerHTML = `<strong>${status.title}</strong><span>${status.reason}</span><em>强推荐线：平均分 ≥ 85，单项 ≥ 70，稳定性 ≥ 75，风险底线通过。</em>`;
   $("metricGrid").innerHTML = Object.entries(state.scores)
-    .map(([key, value]) => `<div><span>${dimensions[key].name}</span><strong>${value}</strong><em>${dimensions[key].description}</em></div>`)
-    .concat([`<div><span>AI Sense 总分</span><strong>${m.total}</strong><em>四项能力平均分</em></div>`])
+    .map(([key, value]) => `<div><span>${dimensions[key].name}</span><strong>${value}</strong><em>三回合：${state.roundScores[key].join(" / ")}</em></div>`)
+    .concat([
+      `<div><span>稳定性</span><strong>${m.stability}</strong><em>同类场景表现是否一致</em></div>`,
+      `<div><span>风险底线</span><strong>${m.riskPass ? "通过" : "未通过"}</strong><em>${m.riskPass ? "未出现高风险误判" : state.riskFailures.join("；")}</em></div>`,
+      `<div><span>AI Sense 总分</span><strong>${m.total}</strong><em>四项能力平均分</em></div>`
+    ])
     .join("");
   $("companyMatches").innerHTML = `<div class="company"><strong>${career.roles}</strong><span>${career.companies}</span><i><b style="width:${m.total}%"></b></i><em>主优势：${dimensions[m.top].name}</em></div>`;
   const record = buildFeishuRecord();
@@ -395,11 +562,11 @@ function renderAdmin() {
     .map((key) => `<div><span>${key}</span><strong>${record[key]}</strong></div>`)
     .join("");
   $("badgeCatalog").innerHTML = badges.map((item) => `<div class="${item.id === badge.id ? "active" : ""}"><strong>${item.name}</strong><span>${item.dimension === "all" ? "四项均衡高分" : item.dimension === "none" ? "总分不足 55" : `${dimensions[item.dimension].name}最高分`}</span></div>`).join("");
-  $("adminEvidence").innerHTML = games.map((game) => `<div class="evidence-row"><strong>${game.title}</strong><span>${state.answers[game.id] || "暂无记录"}</span></div>`).join("");
+  $("adminEvidence").innerHTML = games.map((game) => `<div class="evidence-row"><strong>${game.title}</strong><span>${state.answers[game.id].join("<br>") || "暂无记录"}</span></div>`).join("");
 }
 
 function renderPendingAdmin() {
-  $("adminSource").textContent = "暂无完整记录：请先让候选人在本浏览器完成 4 个小游戏。";
+  $("adminSource").textContent = "暂无完整记录：请先让候选人在本浏览器完成 4 个游戏、12 个短回合。";
   $("adminVerdict").className = "verdict caution";
   $("adminVerdict").innerHTML = "<strong>等待候选人完成测试</strong><span>完成后将生成严格筛选结论。</span><em>进度要求：4 / 4 个游戏完成。</em>";
   $("metricGrid").innerHTML = Object.values(dimensions).map((item) => `<div><span>${item.name}</span><strong>待测</strong><em>${item.description}</em></div>`).join("");
