@@ -17,20 +17,10 @@ The table already has the three public recruiting fields:
 - `推荐公司`
 - `适合岗位`
 
-The web app also sends optional context fields when the proxy accepts them:
-
-- `候选人编号`
-- `测评时间`
-- `AI Sense 身份`
-- `AI Sense 分数`
-- `总分`
-- `推荐等级`
-- `岗位方向`
-- `公司池`
-- `严格结论`
-- `候选人画像`
-- `关键证据`
-- `提交来源`
+The web app computes additional analysis fields for the recruiter view. The example
+proxy intentionally writes only the three required fields above, so it works with
+the current table schema. Add more Feishu columns and extend the proxy whitelist
+only when those fields are needed.
 
 ## Secure Proxy Env Vars
 

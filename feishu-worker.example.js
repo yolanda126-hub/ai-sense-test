@@ -8,6 +8,7 @@ export default {
     const required = ["是否值得推荐", "推荐公司", "适合岗位"];
     const missing = required.filter((key) => !fields[key]);
     if (missing.length) return json({ error: `Missing fields: ${missing.join(", ")}` }, 400);
+    const coreFields = Object.fromEntries(required.map((key) => [key, fields[key]]));
 
     const token = await getTenantAccessToken(env);
     const url = `https://open.feishu.cn/open-apis/bitable/v1/apps/${env.FEISHU_APP_TOKEN}/tables/${env.FEISHU_TABLE_ID}/records`;
@@ -17,7 +18,7 @@ export default {
         "Authorization": `Bearer ${token}`,
         "Content-Type": "application/json; charset=utf-8"
       },
-      body: JSON.stringify({ fields })
+      body: JSON.stringify({ fields: coreFields })
     });
 
     const result = await feishuResponse.json();
