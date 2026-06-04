@@ -83,7 +83,7 @@ https://developers.cloudflare.com/workers/configuration/secrets/
 After deployment, set the public endpoint in `feishu-config.js`:
 
 ```js
-window.AI_SENSE_FEISHU_ENDPOINT = "https://your-worker-url";
+window.AI_SENSE_FEISHU_ENDPOINT = "https://ai-sense-feishu.yolandawang126.workers.dev";
 window.AI_SENSE_FEISHU_AUTO_SUBMIT = true;
 ```
 
@@ -97,4 +97,3 @@ Commit and push the config change. GitHub Pages will auto-publish it.
 - `Agent 人才池`: `适合岗位` contains `Agent`
 - `模型评测人才池`: `适合岗位` contains `模型评测`
 - `本周新增`: `测评时间` is within the current week
-

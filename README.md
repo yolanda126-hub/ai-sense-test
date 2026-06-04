@@ -83,7 +83,7 @@ node scripts/setup-feishu.mjs
 代理部署好后，把它的公开 POST 地址填入 `feishu-config.js`：
 
 ```js
-window.AI_SENSE_FEISHU_ENDPOINT = "https://你的代理地址";
+window.AI_SENSE_FEISHU_ENDPOINT = "https://ai-sense-feishu.yolandawang126.workers.dev";
 ```
 
 候选人完成测试后，页面会自动提交一条记录，核心三列会按以下规则生成：
