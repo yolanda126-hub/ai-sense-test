@@ -70,7 +70,17 @@ https://<你的 GitHub 用户名>.github.io/<仓库名>/?recruiter=1
 - 严格结论
 - 关键证据
 
-公开网页里不要直接放飞书 App Secret。推荐用一个服务端代理或 Cloudflare Worker 调飞书多维表格 API，示例见 `feishu-worker.example.js`。代理部署好后，把它的公开 POST 地址填入 `feishu-config.js`：
+公开网页里不要直接放飞书 App Secret。正式招聘后台采用三张飞书多维表格：候选人结果表、游戏回合明细表、公司与岗位规则表。网站通过服务端代理或 Cloudflare Worker 写入一条候选人结果和 12 条回合证据，示例见 `feishu-worker.example.js`，完整配置见 `FEISHU_SETUP.md`。
+
+飞书应用授权后，可以用一次性脚本自动补齐表结构：
+
+```bash
+FEISHU_APP_ID="..." FEISHU_APP_SECRET="..." \
+FEISHU_APP_TOKEN="..." FEISHU_CANDIDATE_TABLE_ID="..." \
+node scripts/setup-feishu.mjs
+```
+
+代理部署好后，把它的公开 POST 地址填入 `feishu-config.js`：
 
 ```js
 window.AI_SENSE_FEISHU_ENDPOINT = "https://你的代理地址";

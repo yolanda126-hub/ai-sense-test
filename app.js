@@ -10,6 +10,7 @@ const state = {
   scores: { boundary: 0, prompt: 0, verification: 0, workflow: 0 },
   roundScores: { boundary: [], prompt: [], verification: [], workflow: [] },
   answers: { boundary: [], prompt: [], verification: [], workflow: [] },
+  roundResults: [],
   selections: [],
   riskFailures: []
 };
@@ -205,6 +206,7 @@ function reset() {
   state.scores = { boundary: 0, prompt: 0, verification: 0, workflow: 0 };
   state.roundScores = { boundary: [], prompt: [], verification: [], workflow: [] };
   state.answers = { boundary: [], prompt: [], verification: [], workflow: [] };
+  state.roundResults = [];
   state.selections = [];
   state.riskFailures = [];
 }
@@ -327,12 +329,16 @@ function submitGame() {
   let score = 0;
   let evidence = "";
   let criticalMisses = [];
+  let correctAnswer = [];
+  let candidateSelection = [];
 
   if (round.type === "classify") {
     if (state.selections.length < round.cards.length) return feedback("请先为每张任务卡完成分类。", false);
     const correct = round.cards.filter(([text, answer]) => state.selections.find((item) => item.text === text)?.choice === answer).length;
     score = Math.round((correct / round.cards.length) * 100);
     evidence = `正确分类 ${correct}/${round.cards.length}`;
+    candidateSelection = state.selections.map((item) => `${item.text} → ${item.choice}`);
+    correctAnswer = round.cards.map(([text, answer]) => `${text} → ${answer}`);
     criticalMisses = (round.critical || []).filter((text) => {
       const answer = round.cards.find(([cardText]) => cardText === text)?.[1];
       return state.selections.find((item) => item.text === text)?.choice !== answer;
@@ -342,6 +348,8 @@ function submitGame() {
     const correct = state.selections.filter((item) => round.correct.includes(item)).length;
     score = Math.round((correct / round.correct.length) * 100);
     evidence = `命中关键项 ${correct}/${round.correct.length}：${state.selections.join("、")}`;
+    candidateSelection = [...state.selections];
+    correctAnswer = [...round.correct];
     criticalMisses = (round.critical || []).filter((text) => !state.selections.includes(text));
   } else {
     if (state.selections.length < 5) return feedback("请先完成 5 步执行路线。", false);
@@ -349,13 +357,30 @@ function submitGame() {
     const contentHits = state.selections.filter((item) => round.correct.includes(item)).length;
     score = Math.round(positionHits * 12 + contentHits * 8);
     evidence = `步骤命中 ${contentHits}/5，顺序命中 ${positionHits}/5：${state.selections.join(" → ")}`;
+    candidateSelection = [...state.selections];
+    correctAnswer = [...round.correct];
   }
 
   if (criticalMisses.length) {
     state.riskFailures.push(`${game.title}回合${state.round + 1}：${criticalMisses.join("、")}`);
   }
-  state.roundScores[game.id].push(Math.min(100, score));
+  score = Math.min(100, score);
+  state.roundScores[game.id].push(score);
   state.answers[game.id].push(`回合${state.round + 1} ${evidence}`);
+  state.roundResults.push({
+    gameId: game.id,
+    gameName: game.title,
+    dimension: game.id,
+    roundNumber: state.round + 1,
+    scenario: round.question,
+    type: round.type,
+    selections: candidateSelection,
+    correctAnswer,
+    score,
+    isCritical: Boolean(round.critical?.length),
+    riskTriggered: criticalMisses.length > 0,
+    evidence
+  });
   state.scores[game.id] = average(state.roundScores[game.id]);
 
   feedback(score >= 80 ? "判断很稳，进入下一回合。" : score >= 60 ? "有不错的直觉，再看一个不同场景。" : "这里暴露了一个值得继续训练的盲区。", true);
@@ -454,6 +479,32 @@ function buildFeishuRecord() {
   };
 }
 
+function buildFeishuPayload(snapshot) {
+  return {
+    source: "ai-sense-test",
+    candidate: {
+      ...snapshot.feishuRecord,
+      "候选人编号": snapshot.id,
+      "测评时间": snapshot.savedAt,
+      "来源": "AI Sense 测试"
+    },
+    rounds: snapshot.roundResults.map((result) => ({
+      "候选人编号": snapshot.id,
+      "游戏名称": result.gameName,
+      "能力维度": dimensions[result.dimension]?.name || result.dimension,
+      "回合编号": result.roundNumber,
+      "场景名称": result.scenario,
+      "题目类型": result.type,
+      "候选人选择": result.selections.join(result.type === "order" ? " → " : "\n"),
+      "正确答案": result.correctAnswer.join(result.type === "order" ? " → " : "\n"),
+      "回合得分": result.score,
+      "是否高风险题": result.isCritical ? "是" : "否",
+      "是否触发风险": result.riskTriggered ? "是" : "否",
+      "行为证据": result.evidence
+    }))
+  };
+}
+
 function evidenceText() {
   return games.map((game) => `${game.title}: ${state.answers[game.id].join(" / ")}`).join("\n");
 }
@@ -465,6 +516,7 @@ function snapshotState() {
     scores: { ...state.scores },
     roundScores: structuredClone(state.roundScores),
     answers: structuredClone(state.answers),
+    roundResults: structuredClone(state.roundResults),
     riskFailures: [...state.riskFailures],
     feishuRecord: buildFeishuRecord()
   };
@@ -487,6 +539,7 @@ function restoreSnapshot(snapshot) {
   state.scores = { ...state.scores, ...snapshot.scores };
   state.roundScores = { ...state.roundScores, ...snapshot.roundScores };
   state.answers = { ...state.answers, ...snapshot.answers };
+  state.roundResults = Array.isArray(snapshot.roundResults) ? structuredClone(snapshot.roundResults) : [];
   state.riskFailures = Array.isArray(snapshot.riskFailures) ? snapshot.riskFailures : [];
   state.stage = games.length;
   state.round = 0;
@@ -503,7 +556,6 @@ function loadLatestStoredResult() {
 
 async function submitFeishuRecord(snapshot) {
   const note = $("feishuSyncNote");
-  const record = { ...snapshot.feishuRecord, "候选人编号": snapshot.id, "测评时间": snapshot.savedAt };
   if (!FEISHU_ENDPOINT) {
     note.textContent = "测试结果已生成。投递简历后，我们会结合结果一起查看。";
     return;
@@ -513,7 +565,7 @@ async function submitFeishuRecord(snapshot) {
     const response = await fetch(FEISHU_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fields: record, source: "ai-sense-test" })
+      body: JSON.stringify(buildFeishuPayload(snapshot))
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     note.textContent = "测试结果已同步。";
