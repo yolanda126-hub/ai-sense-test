@@ -10,8 +10,8 @@
     <title>AI Sense 测试</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=Press+Start+2P&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css?v=game-demo-20260604" />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css?v=candidate-polish-20260605" />
   </head>
   <body>
     <main class="app">
@@ -19,7 +19,7 @@
         <div class="brand">
           <span class="logo"></span>
           <div>
-            <p>AI Sense Arcade</p>
+            <p>AI Sense Lab</p>
             <h1>AI Sense 测试</h1>
           </div>
         </div>
@@ -34,13 +34,16 @@
       <section id="home" class="screen active home game-home">
         <div class="home-copy">
           <p class="eyebrow">4-Minute AI Sense Test</p>
-          <h2>别说你懂 AI。<br />玩给我看。</h2>
-          <p>4 个精简小游戏，每关 3 个短回合，测试你是否知道 AI 的边界、会提需求、能查错、能搭流程。</p>
+          <h2>别说你懂 AI，<br />玩给我看。</h2>
+          <p>4 个小游戏，12 个短回合。看你是否知道边界、会拆任务、能查错、能搭流程。</p>
           <div class="actions">
             <button class="primary" id="startBtn">开始挑战</button>
           </div>
         </div>
         <div class="game-preview" aria-hidden="true">
+          <div class="preview-core">
+            <span></span><span></span><span></span><span></span>
+          </div>
           <div class="preview-chip"><span>01</span><strong>BOUNDARY</strong><em>知道什么时候不能信</em></div>
           <div class="preview-chip"><span>02</span><strong>PROMPT</strong><em>把模糊任务说清楚</em></div>
           <div class="preview-chip"><span>03</span><strong>VERIFY</strong><em>从漂亮答案里找错</em></div>
@@ -82,14 +85,14 @@
           </div>
         </div>
         <article class="public-panel">
-          <h3>可分享文案</h3>
+          <h3>分享你的身份</h3>
           <p id="shareText"></p>
         </article>
         <article class="public-panel resume-panel">
           <div>
             <p class="eyebrow">AI Sense Talent</p>
             <h3>我们也在收集有 AI Sense 的简历</h3>
-            <p>如果你对 AI 产品、模型评测、Agent 或 AI 商业落地感兴趣，可以投递简历给我们。</p>
+            <p>如果你对 AI 产品、模型评测、Agent 或 AI 商业落地感兴趣，可以把简历投给我们。</p>
           </div>
           <label class="resume-upload">
             <span>选择简历附件</span>
