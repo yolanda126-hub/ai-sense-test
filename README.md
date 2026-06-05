@@ -69,8 +69,9 @@ https://<你的 GitHub 用户名>.github.io/<仓库名>/?recruiter=1
 - Agent 工作流
 - 严格结论
 - 关键证据
+- 简历附件
 
-公开网页里不要直接放飞书 App Secret。正式招聘后台采用三张飞书多维表格：候选人结果表、游戏回合明细表、公司与岗位规则表。网站通过服务端代理或 Cloudflare Worker 写入一条候选人结果和 12 条回合证据，示例见 `feishu-worker.example.js`，完整配置见 `FEISHU_SETUP.md`。
+公开网页里不要直接放飞书 App Secret。正式招聘后台采用三张飞书多维表格：候选人结果表、游戏回合明细表、公司与岗位规则表。网站通过服务端代理或 Cloudflare Worker 写入一条候选人结果和 12 条回合证据；候选人上传简历后，Worker 会把附件补写到同一条候选人记录的 `简历附件` 字段。示例见 `feishu-worker.example.js`，完整配置见 `FEISHU_SETUP.md`。
 
 飞书应用授权后，可以用一次性脚本自动补齐表结构：
 

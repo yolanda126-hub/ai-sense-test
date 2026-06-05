@@ -91,3 +91,55 @@ test("worker creates one whitelisted candidate record and twelve round records",
     globalThis.fetch = originalFetch;
   }
 });
+
+test("worker uploads a resume and attaches it to the existing candidate record", async () => {
+  const { default: worker } = await loadWorker();
+  const calls = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    calls.push({ url: String(url), method: options?.method, body: options?.body });
+    if (String(url).includes("tenant_access_token")) {
+      return Response.json({ code: 0, tenant_access_token: "token" });
+    }
+    if (String(url).includes("/drive/v1/medias/upload_all")) {
+      assert.equal(options.body instanceof FormData, true);
+      return Response.json({ code: 0, data: { file_token: "file-token-1" } });
+    }
+    return Response.json({ code: 0, data: { record: { record_id: "rec-1" } } });
+  };
+
+  try {
+    const response = await worker.fetch(request({
+      resume: {
+        candidateRecordId: "rec-1",
+        fileName: "resume.pdf",
+        mimeType: "application/pdf",
+        size: 5,
+        dataBase64: Buffer.from("hello").toString("base64")
+      }
+    }), env);
+    assert.equal(response.status, 200);
+    assert.equal(calls.length, 3);
+    assert.equal(calls[1].url.includes("/drive/v1/medias/upload_all"), true);
+    assert.equal(calls[2].method, "PUT");
+    assert.equal(calls[2].url.endsWith("/candidate-table/records/rec-1"), true);
+    assert.deepEqual(JSON.parse(calls[2].body).fields["简历附件"], [{ file_token: "file-token-1" }]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("worker rejects oversized resume uploads", async () => {
+  const { default: worker } = await loadWorker();
+  const response = await worker.fetch(request({
+    resume: {
+      candidateRecordId: "rec-1",
+      fileName: "resume.pdf",
+      mimeType: "application/pdf",
+      size: 20 * 1024 * 1024 + 1,
+      dataBase64: "AA=="
+    }
+  }), env);
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error, /20 MB/);
+});

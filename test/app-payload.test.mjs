@@ -73,3 +73,25 @@ test("buildFeishuPayload returns one candidate and twelve round results", async 
   assert.equal(payload.rounds[0]["候选人选择"], "候选人选择");
 });
 
+test("buildResumePayload attaches a selected resume to the Feishu candidate record", async () => {
+  const context = await loadApp();
+  const payload = vm.runInContext("buildResumePayload", context)(
+    { id: "AIS-123", feishuCandidateRecordId: "rec-1" },
+    { name: "resume.pdf", type: "application/pdf", size: 1234 },
+    "base64-file"
+  );
+
+  assert.equal(payload.source, "ai-sense-test");
+  assert.equal(payload.resume.candidateId, "AIS-123");
+  assert.equal(payload.resume.candidateRecordId, "rec-1");
+  assert.equal(payload.resume.fileName, "resume.pdf");
+  assert.equal(payload.resume.dataBase64, "base64-file");
+});
+
+test("validateResumeFile blocks unsupported or oversized files", async () => {
+  const context = await loadApp();
+  const validateResumeFile = vm.runInContext("validateResumeFile", context);
+  assert.equal(validateResumeFile({ name: "resume.pdf", size: 1024 }), "");
+  assert.match(validateResumeFile({ name: "resume.png", size: 1024 }), /仅支持/);
+  assert.match(validateResumeFile({ name: "resume.pdf", size: 20 * 1024 * 1024 + 1 }), /20MB/);
+});

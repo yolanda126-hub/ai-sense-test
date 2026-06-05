@@ -1,5 +1,6 @@
 const TEXT = 1;
 const NUMBER = 2;
+const ATTACHMENT = 17;
 
 export const CANDIDATE_FIELDS = [
   text("候选人编号"),
@@ -17,6 +18,7 @@ export const CANDIDATE_FIELDS = [
   number("Agent 工作流"),
   text("严格结论"),
   text("关键证据"),
+  attachment("简历附件"),
   text("来源")
 ];
 
@@ -53,6 +55,10 @@ function text(fieldName) {
 
 function number(fieldName) {
   return { field_name: fieldName, type: NUMBER };
+}
+
+function attachment(fieldName) {
+  return { field_name: fieldName, type: ATTACHMENT };
 }
 
 async function main() {
@@ -147,4 +153,3 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     process.exitCode = 1;
   });
 }
-

@@ -18,7 +18,8 @@ One row per completed assessment:
 
 `候选人编号`, `测评时间`, `是否值得推荐`, `推荐公司`, `适合岗位`,
 `AI Sense 身份`, `AI Sense 分数`, `稳定性`, `风险底线`, `模型边界`,
-`任务拆解`, `验证意识`, `Agent 工作流`, `严格结论`, `关键证据`, `来源`
+`任务拆解`, `验证意识`, `Agent 工作流`, `严格结论`, `关键证据`,
+`简历附件`, `来源`
 
 ### 游戏回合明细表
 
@@ -47,6 +48,13 @@ Feishu API references:
 - Create field: https://open.feishu.cn/document/server-docs/docs/bitable-v1/app-table-field/create
 - Create record: https://open.feishu.cn/document/server-docs/docs/bitable-v1/app-table-record/create
 - Batch create records: https://open.feishu.cn/document/server-docs/docs/bitable-v1/app-table-record/batch_create
+- Upload media for attachment fields: https://open.feishu.cn/document/server-docs/docs/drive-v1/media/upload_all
+- Update record: https://open.feishu.cn/document/server-docs/docs/bitable-v1/app-table-record/update
+
+Resume uploads also require an attachment-capable permission such as viewing,
+editing, and managing Bitable, or uploading images and attachments to cloud
+documents. The Worker uploads resumes with `parent_type=bitable_file` and writes
+the returned `file_token` into the candidate row's `简历附件` field.
 
 ## Initialize The Tables
 

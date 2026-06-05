@@ -3,6 +3,11 @@ const RESULT_STORAGE_KEY = "aiSense.latestResult.v3";
 const RESULT_HISTORY_KEY = "aiSense.resultHistory.v3";
 const FEISHU_ENDPOINT = window.AI_SENSE_FEISHU_ENDPOINT || "";
 const FEISHU_AUTO_SUBMIT = window.AI_SENSE_FEISHU_AUTO_SUBMIT !== false;
+const MAX_RESUME_BYTES = 20 * 1024 * 1024;
+const RESUME_EXTENSIONS = new Set(["pdf", "doc", "docx", "txt"]);
+
+let latestResultSnapshot = null;
+let feishuSubmitPromise = null;
 
 const state = {
   stage: 0,
@@ -505,6 +510,20 @@ function buildFeishuPayload(snapshot) {
   };
 }
 
+function buildResumePayload(snapshot, file, dataBase64) {
+  return {
+    source: "ai-sense-test",
+    resume: {
+      candidateId: snapshot.id,
+      candidateRecordId: snapshot.feishuCandidateRecordId,
+      fileName: file.name,
+      mimeType: file.type || "application/octet-stream",
+      size: file.size,
+      dataBase64
+    }
+  };
+}
+
 function evidenceText() {
   return games.map((game) => `${game.title}: ${state.answers[game.id].join(" / ")}`).join("\n");
 }
@@ -524,14 +543,20 @@ function snapshotState() {
 
 function saveResultSnapshot() {
   const snapshot = snapshotState();
+  latestResultSnapshot = snapshot;
+  persistResultSnapshot(snapshot);
+  return snapshot;
+}
+
+function persistResultSnapshot(snapshot) {
   try {
     const history = JSON.parse(localStorage.getItem(RESULT_HISTORY_KEY) || "[]");
+    const nextHistory = [snapshot, ...history.filter((item) => item.id !== snapshot.id)].slice(0, 20);
     localStorage.setItem(RESULT_STORAGE_KEY, JSON.stringify(snapshot));
-    localStorage.setItem(RESULT_HISTORY_KEY, JSON.stringify([snapshot, ...history].slice(0, 20)));
+    localStorage.setItem(RESULT_HISTORY_KEY, JSON.stringify(nextHistory));
   } catch {
     // The in-memory result still works when local storage is unavailable.
   }
-  return snapshot;
 }
 
 function restoreSnapshot(snapshot) {
@@ -558,7 +583,7 @@ async function submitFeishuRecord(snapshot) {
   const note = $("feishuSyncNote");
   if (!FEISHU_ENDPOINT) {
     note.textContent = "测试结果已生成。投递简历后，我们会结合结果一起查看。";
-    return;
+    return false;
   }
   note.textContent = "测试结果正在同步。";
   try {
@@ -568,9 +593,15 @@ async function submitFeishuRecord(snapshot) {
       body: JSON.stringify(buildFeishuPayload(snapshot))
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    snapshot.feishuCandidateRecordId = data.candidateRecord?.record_id || data.candidateRecordId || "";
+    latestResultSnapshot = snapshot;
+    persistResultSnapshot(snapshot);
     note.textContent = "测试结果已同步。";
+    return Boolean(snapshot.feishuCandidateRecordId);
   } catch {
     note.textContent = "测试结果已生成，同步稍后重试。";
+    return false;
   }
 }
 
@@ -589,7 +620,7 @@ function renderResults() {
   $("shareText").textContent = `我在 4 个小游戏里测出了「${badge.name}」AI Sense 身份：${badge.tagline}`;
   renderAdmin();
   show("result");
-  if (FEISHU_AUTO_SUBMIT) submitFeishuRecord(snapshot);
+  feishuSubmitPromise = FEISHU_AUTO_SUBMIT ? submitFeishuRecord(snapshot) : Promise.resolve(false);
 }
 
 function renderAdmin() {
@@ -638,13 +669,85 @@ function openRecruiterView() {
 
 function setupResumeUpload() {
   const input = $("resumeFile");
+  const button = $("uploadResumeBtn");
   input.onchange = () => {
     const file = input.files?.[0];
     if (!file) return;
-    $("resumeNote").textContent = `已选择：${file.name}。点击下方按钮后，请在邮件中附上这份简历。`;
-    const body = encodeURIComponent(`你好，我完成了 AI Sense 测试。\n\n我的身份：${resolveBadge().name}\n简历附件：${file.name}`);
-    $("resumeMailLink").href = `mailto:talent@example.com?subject=AI%20Sense%20简历投递&body=${body}`;
+    const error = validateResumeFile(file);
+    $("resumeNote").textContent = error || `已选择：${file.name}。点击按钮即可上传到飞书表格。`;
+    button.disabled = Boolean(error);
   };
+  button.onclick = uploadSelectedResume;
+}
+
+function validateResumeFile(file) {
+  if (!file) return "请先选择一份简历。";
+  if (file.size <= 0) return "这份文件是空的，请重新选择。";
+  if (file.size > MAX_RESUME_BYTES) return "文件超过 20MB，请压缩后再上传。";
+  const extension = file.name.split(".").pop()?.toLowerCase();
+  if (!RESUME_EXTENSIONS.has(extension)) return "仅支持 PDF / Word / TXT 简历。";
+  return "";
+}
+
+async function uploadSelectedResume() {
+  const file = $("resumeFile").files?.[0];
+  const button = $("uploadResumeBtn");
+  const note = $("resumeNote");
+  const validationError = validateResumeFile(file);
+  if (validationError) {
+    note.textContent = validationError;
+    return;
+  }
+  if (!FEISHU_ENDPOINT) {
+    note.textContent = "当前没有配置飞书提交接口，暂时无法上传简历。";
+    return;
+  }
+
+  button.disabled = true;
+  note.textContent = "正在确认你的测评结果。";
+  try {
+    const snapshot = await ensureFeishuCandidateRecord();
+    note.textContent = "正在上传简历到飞书。";
+    const dataBase64 = await fileToBase64(file);
+    const response = await fetch(FEISHU_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(buildResumePayload(snapshot, file, dataBase64))
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    note.textContent = "简历已上传，我们会结合你的 AI Sense 结果一起查看。";
+    button.textContent = "已上传";
+  } catch {
+    note.textContent = "简历暂时没有上传成功，请稍后重试。";
+    button.disabled = false;
+  }
+}
+
+async function ensureFeishuCandidateRecord() {
+  if (!latestResultSnapshot) {
+    loadLatestStoredResult();
+    try {
+      latestResultSnapshot = JSON.parse(localStorage.getItem(RESULT_STORAGE_KEY) || "null");
+    } catch {
+      latestResultSnapshot = null;
+    }
+  }
+  if (!latestResultSnapshot) throw new Error("Missing latest result");
+  if (latestResultSnapshot.feishuCandidateRecordId) return latestResultSnapshot;
+  if (feishuSubmitPromise) await feishuSubmitPromise;
+  if (latestResultSnapshot.feishuCandidateRecordId) return latestResultSnapshot;
+  const synced = await submitFeishuRecord(latestResultSnapshot);
+  if (!synced || !latestResultSnapshot.feishuCandidateRecordId) throw new Error("Missing Feishu record ID");
+  return latestResultSnapshot;
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
 }
 
 document.addEventListener("DOMContentLoaded", () => {

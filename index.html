@@ -98,8 +98,8 @@
             <span>选择简历附件</span>
             <input id="resumeFile" type="file" accept=".pdf,.doc,.docx,.txt" />
           </label>
-          <p id="resumeNote" class="resume-note">支持 PDF / Word。演示版会记录文件名，正式版可接入飞书表单。</p>
-          <a class="primary resume-link" id="resumeMailLink" href="mailto:talent@example.com?subject=AI%20Sense%20%E7%AE%80%E5%8E%86%E6%8A%95%E9%80%92">发送投递邮件</a>
+          <p id="resumeNote" class="resume-note">支持 PDF / Word / TXT，20MB 以内。上传后会和你的测试结果一起进入飞书表格。</p>
+          <button class="primary resume-link" id="uploadResumeBtn" type="button">上传简历到飞书</button>
         </article>
         <div class="actions">
           <button class="primary" id="restartBtn">重新开始</button>
@@ -134,6 +134,6 @@
       </section>
     </main>
     <script src="./feishu-config.js?v=20260602" defer></script>
-    <script src="./app.js?v=feishu-backend-20260604" defer></script>
+    <script src="./app.js?v=feishu-resume-20260605" defer></script>
   </body>
 </html>
