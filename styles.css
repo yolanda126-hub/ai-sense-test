@@ -89,13 +89,10 @@ h1, h2, h3, p { margin-top: 0; }
 .logo-mark {
   display: grid;
   place-items: center;
-  width: 118px;
-  height: 42px;
-  padding: 7px 10px;
-  border: 1px solid rgba(238, 255, 245, .16);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, .94);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, .18);
+  width: 74px;
+  height: 38px;
+  padding: 0;
+  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, .22));
 }
 
 .logo-mark img,
@@ -638,13 +635,10 @@ body.recruiter-mode .internal-only.hidden,
   top: 22px;
   right: 24px;
   z-index: 2;
-  width: 132px;
-  height: 48px;
-  padding: 8px 10px;
-  border: 1px solid rgba(238, 255, 245, .2);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, .92);
-  box-shadow: 0 16px 36px rgba(0,0,0,.18);
+  width: 86px;
+  height: 44px;
+  opacity: .9;
+  filter: drop-shadow(0 12px 22px rgba(0,0,0,.24));
 }
 
 .share-card::after {
@@ -685,7 +679,7 @@ body.recruiter-mode .internal-only.hidden,
 
 .share-card h2 {
   max-width: 720px;
-  padding-right: 130px;
+  padding-right: 96px;
   margin-bottom: 12px;
   color: #fff;
   font-size: clamp(36px, 5.5vw, 66px);
@@ -877,12 +871,10 @@ body.recruiter-mode .internal-only.hidden,
   grid-row: 1 / span 2;
   display: grid;
   place-items: center;
-  width: 112px;
-  height: 40px;
-  padding: 7px 9px;
-  border: 1px solid rgba(238, 255, 245, .12);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, .9);
+  width: 66px;
+  height: 34px;
+  opacity: .72;
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, .16));
 }
 
 .site-footer p {
@@ -978,7 +970,7 @@ body.recruiter-mode .internal-only.hidden,
   .site-footer { width: calc(100% - 14px); }
   .topbar { gap: 10px; padding: 10px; }
   .brand { gap: 9px; }
-  .logo-mark { width: 96px; height: 36px; padding: 6px 8px; border-radius: 12px; }
+  .logo-mark { width: 64px; height: 34px; }
   .logo { width: 32px; height: 32px; border-radius: 10px; }
   .brand p { font-size: 10px; }
   .brand h1 { font-size: 20px; }
