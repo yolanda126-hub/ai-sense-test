@@ -23,7 +23,7 @@ const env = {
   FEISHU_ROUND_TABLE_ID: "round-table"
 };
 
-test("worker rejects payloads without twelve round records", async () => {
+test("worker rejects payloads without fourteen round records", async () => {
   const { default: worker } = await loadWorker();
   const response = await worker.fetch(request({
     candidate: {
@@ -36,10 +36,10 @@ test("worker rejects payloads without twelve round records", async () => {
     rounds: []
   }), env);
   assert.equal(response.status, 400);
-  assert.match((await response.json()).error, /12/);
+  assert.match((await response.json()).error, /14/);
 });
 
-test("worker creates one whitelisted candidate record and twelve round records", async () => {
+test("worker creates one whitelisted candidate record and fourteen round records", async () => {
   const { default: worker } = await loadWorker();
   const calls = [];
   const originalFetch = globalThis.fetch;
@@ -63,7 +63,7 @@ test("worker creates one whitelisted candidate record and twelve round records",
       "适合岗位": "Agent 产品经理",
       "不允许字段": "不应写入"
     };
-    const rounds = Array.from({ length: 12 }, (_, index) => ({
+    const rounds = Array.from({ length: 14 }, (_, index) => ({
       "候选人编号": "AIS-123",
       "游戏名称": "边界雷达",
       "能力维度": "模型边界",
@@ -85,7 +85,7 @@ test("worker creates one whitelisted candidate record and twelve round records",
     assert.equal(calls[1].url.includes("/candidate-table/records"), true);
     assert.equal(calls[2].url.includes("/round-table/records/batch_create"), true);
     assert.equal(calls[1].body.fields["不允许字段"], undefined);
-    assert.equal(calls[2].body.records.length, 12);
+    assert.equal(calls[2].body.records.length, 14);
     assert.equal(calls[2].body.records[0].fields["不允许字段"], undefined);
   } finally {
     globalThis.fetch = originalFetch;

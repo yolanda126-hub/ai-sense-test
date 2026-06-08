@@ -10,7 +10,7 @@ test("Feishu schema includes every candidate field written by the proxy", () => 
   assert.equal(CANDIDATE_FIELDS.find((field) => field.field_name === "简历附件")?.type, 17);
 });
 
-test("Feishu schema defines twelve-round evidence and matching rules", () => {
+test("Feishu schema defines round evidence and matching rules", () => {
   const roundNames = ROUND_FIELDS.map((field) => field.field_name);
   const ruleNames = RULE_FIELDS.map((field) => field.field_name);
   assert.equal(roundNames.includes("候选人选择"), true);

@@ -543,7 +543,8 @@ body.recruiter-mode .internal-only.hidden,
 
 .component-card:hover,
 .statement-card:hover,
-.workflow-step:hover {
+.workflow-step:hover,
+.speed-card:hover {
   transform: translateY(-2px);
   border-color: rgba(82, 231, 242, .55);
 }
@@ -556,6 +557,124 @@ body.recruiter-mode .internal-only.hidden,
 .statement-card.selected {
   border-color: rgba(255, 108, 95, .85);
   background: #ffe1dc;
+}
+
+.speed-lab,
+.flash-lab {
+  display: grid;
+  gap: 16px;
+}
+
+.speed-meter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid rgba(82, 231, 242, .28);
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(82, 231, 242, .16), rgba(200, 255, 92, .08)),
+    #111923;
+  color: #eefbf4;
+}
+
+.speed-meter strong {
+  color: var(--lime);
+  font-family: "IBM Plex Sans", sans-serif;
+  font-size: 34px;
+  line-height: 1;
+}
+
+.speed-meter span {
+  color: rgba(238, 251, 244, .74);
+  font-weight: 800;
+}
+
+.speed-grid,
+.flash-options {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.speed-card {
+  min-height: 132px;
+  padding: 14px;
+  border: 1px solid rgba(16, 24, 32, .12);
+  border-radius: 16px;
+  background: #f7fbf7;
+  color: var(--ink);
+  text-align: left;
+  box-shadow: 0 8px 0 #101820;
+  transition: transform .12s ease, background .12s ease, box-shadow .12s ease, opacity .12s ease;
+}
+
+.speed-card span {
+  display: block;
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-family: "IBM Plex Sans", sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .06em;
+}
+
+.speed-card strong {
+  display: block;
+  font-size: 19px;
+  line-height: 1.35;
+}
+
+.speed-card.selected {
+  transform: translateY(6px);
+  background: #dffbff;
+  box-shadow: 0 2px 0 #101820;
+}
+
+.speed-card:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+  transform: none;
+}
+
+.flash-frame {
+  min-height: 260px;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  border: 1px solid rgba(200, 255, 92, .3);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(200, 255, 92, .28), transparent 34%),
+    linear-gradient(135deg, rgba(82, 231, 242, .18), rgba(255, 108, 95, .12)),
+    #111923;
+  color: #eefbf4;
+  text-align: center;
+  animation: flashPulse 1.25s ease both;
+}
+
+.flash-frame p {
+  margin: 0 0 12px;
+  color: var(--lime);
+  font-family: "IBM Plex Sans", sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.flash-frame strong {
+  max-width: 760px;
+  font-size: clamp(24px, 4vw, 42px);
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+@keyframes flashPulse {
+  0% { filter: brightness(.7); transform: scale(.98); }
+  28% { filter: brightness(1.35); transform: scale(1.01); }
+  100% { filter: brightness(.9); transform: scale(1); }
 }
 
 .workflow-layout {
@@ -943,6 +1062,9 @@ body.recruiter-mode .internal-only.hidden,
   .game-area { min-height: 0; padding: 14px; }
   .game-brief, .game-footer { padding: 15px; }
   .game-footer { display: grid; }
+  .speed-grid, .flash-options { grid-template-columns: 1fr; }
+  .speed-card { min-height: auto; }
+  .flash-frame { min-height: 220px; }
   .classify-grid, .component-grid, .statement-grid, .workflow-pool { grid-template-columns: 1fr; }
   .category-buttons { grid-template-columns: 1fr; }
   .task-card, .component-card, .statement-card { min-height: auto; }

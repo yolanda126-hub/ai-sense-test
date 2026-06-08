@@ -17,7 +17,7 @@ export default {
     const required = ["候选人编号", "测评时间", "是否值得推荐", "推荐公司", "适合岗位"];
     const missing = required.filter((key) => !candidate[key]);
     if (missing.length) return json({ error: `Missing fields: ${missing.join(", ")}` }, 400);
-    if (rounds.length !== 12) return json({ error: "Exactly 12 round records are required" }, 400);
+    if (rounds.length !== 14) return json({ error: "Exactly 14 round records are required" }, 400);
 
     const invalidRound = rounds.find((round) => !round["候选人编号"] || !round["游戏名称"] || !round["回合编号"]);
     if (invalidRound) return json({ error: "Every round record requires candidate ID, game name, and round number" }, 400);

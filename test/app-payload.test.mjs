@@ -28,7 +28,7 @@ async function loadApp() {
   return context;
 }
 
-test("buildFeishuPayload returns one candidate and twelve round results", async () => {
+test("buildFeishuPayload returns one candidate and fourteen round results", async () => {
   const context = await loadApp();
   const state = vm.runInContext("state", context);
   const games = vm.runInContext("games", context);
@@ -68,9 +68,55 @@ test("buildFeishuPayload returns one candidate and twelve round results", async 
 
   assert.equal(payload.source, "ai-sense-test");
   assert.equal(payload.candidate["候选人编号"], snapshot.id);
-  assert.equal(payload.rounds.length, 12);
+  assert.equal(vm.runInContext("totalRounds()", context), 14);
+  assert.equal(payload.rounds.length, 14);
   assert.equal(payload.rounds[0]["游戏名称"], "边界雷达");
   assert.equal(payload.rounds[0]["候选人选择"], "候选人选择");
+});
+
+test("scoreSpeedRound rewards fast correct taps and penalizes risky taps", async () => {
+  const context = await loadApp();
+  const scoreSpeedRound = vm.runInContext("scoreSpeedRound", context);
+  const round = {
+    targets: ["总结公开材料", "提取会议待办", "改写普通文案"],
+    traps: ["决定患者是否停药", "判断候选人心理疾病"]
+  };
+
+  assert.equal(scoreSpeedRound(round, [
+    { text: "总结公开材料", reactionMs: 520 },
+    { text: "提取会议待办", reactionMs: 760 },
+    { text: "改写普通文案", reactionMs: 980 }
+  ]).score, 100);
+
+  const risky = scoreSpeedRound(round, [
+    { text: "总结公开材料", reactionMs: 520 },
+    { text: "决定患者是否停药", reactionMs: 620 }
+  ]);
+  assert.equal(risky.riskTriggered, true);
+  assert.ok(risky.score < 60);
+});
+
+test("scoreFlashRound checks remembered evidence without rewarding hallucinated details", async () => {
+  const context = await loadApp();
+  const scoreFlashRound = vm.runInContext("scoreFlashRound", context);
+  const round = {
+    correct: ["上线前做过 A/B 测试", "引用了用户访谈原文", "没有提到模型训练经验"],
+    traps: ["负责过大模型训练", "已经证明商业模式跑通"]
+  };
+
+  assert.equal(scoreFlashRound(round, [
+    "上线前做过 A/B 测试",
+    "引用了用户访谈原文",
+    "没有提到模型训练经验"
+  ]).score, 100);
+
+  const hallucinated = scoreFlashRound(round, [
+    "上线前做过 A/B 测试",
+    "负责过大模型训练",
+    "已经证明商业模式跑通"
+  ]);
+  assert.equal(hallucinated.riskTriggered, true);
+  assert.equal(hallucinated.score, 20);
 });
 
 test("buildResumePayload attaches a selected resume to the Feishu candidate record", async () => {

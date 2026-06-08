@@ -17,6 +17,8 @@ const state = {
   answers: { boundary: [], prompt: [], verification: [], workflow: [] },
   roundResults: [],
   selections: [],
+  roundStartedAt: 0,
+  flashRevealed: false,
   riskFailures: []
 };
 
@@ -44,6 +46,15 @@ const games = [
           ["从会议记录中提取待办", "可交给 AI"],
           ["生成合同风险提示", "需要人审"]
         ]
+      },
+      {
+        question: "AI Signal Tap：看到低风险任务就快速点击。",
+        instruction: "只点适合交给 AI 初步处理的任务，危险决策不要点。",
+        type: "speed",
+        durationMs: 3000,
+        targets: ["总结公开材料", "提取会议待办", "改写普通文案"],
+        traps: ["决定患者是否停药", "判断候选人心理疾病"],
+        options: ["总结公开材料", "决定患者是否停药", "提取会议待办", "判断候选人心理疾病", "改写普通文案"]
       },
       {
         question: "专业工作里，AI 应该承担到哪一步？",
@@ -106,6 +117,22 @@ const games = [
     code: "VERIFY",
     title: "幻觉排雷",
     rounds: [
+      {
+        question: "Flash Evidence：刚刚闪过的证据是什么？",
+        instruction: "证据只出现一瞬间。凭记忆选择 3 个你确实看到的信息，不要脑补。",
+        type: "flash",
+        revealMs: 1250,
+        correct: ["上线前做过 A/B 测试", "引用了用户访谈原文", "没有提到模型训练经验"],
+        traps: ["负责过大模型训练", "已经证明商业模式跑通"],
+        options: [
+          "上线前做过 A/B 测试",
+          "负责过大模型训练",
+          "引用了用户访谈原文",
+          "已经证明商业模式跑通",
+          "没有提到模型训练经验",
+          "拿到了医疗行业资质"
+        ]
+      },
       {
         question: "候选人分析里藏着 3 个不可靠的结论。",
         instruction: "点击你认为有问题的句子。",
@@ -213,6 +240,8 @@ function reset() {
   state.answers = { boundary: [], prompt: [], verification: [], workflow: [] };
   state.roundResults = [];
   state.selections = [];
+  state.roundStartedAt = 0;
+  state.flashRevealed = false;
   state.riskFailures = [];
 }
 
@@ -231,27 +260,35 @@ function currentRound() {
 }
 
 function completedRounds() {
-  return state.stage * 3 + state.round;
+  return games.slice(0, state.stage).reduce((sum, game) => sum + game.rounds.length, 0) + state.round;
+}
+
+function totalRounds() {
+  return games.reduce((sum, game) => sum + game.rounds.length, 0);
 }
 
 function renderGame() {
   const game = currentGame();
   const round = currentRound();
   state.selections = [];
+  state.roundStartedAt = Date.now();
+  state.flashRevealed = false;
   $("hudStage").textContent = game.title;
-  $("hudProgress").textContent = `${state.stage} / 4`;
-  $("gameKicker").textContent = `关卡 ${state.stage + 1} / 4 · 回合 ${state.round + 1} / 3`;
+  $("hudProgress").textContent = `${completedRounds()} / ${totalRounds()}`;
+  $("gameKicker").textContent = `关卡 ${state.stage + 1} / ${games.length} · 回合 ${state.round + 1} / ${game.rounds.length}`;
   $("gameTitle").textContent = game.title;
   $("gameCode").textContent = game.code;
   $("gameQuestion").textContent = round.question;
   $("gameInstruction").textContent = round.instruction;
   $("gameFeedback").textContent = "完成操作后提交。";
   $("gameFeedback").className = "";
-  $("gameBar").style.width = `${(completedRounds() / 12) * 100}%`;
+  $("gameBar").style.width = `${(completedRounds() / totalRounds()) * 100}%`;
   $("submitGameBtn").disabled = false;
   const area = $("gameArea");
   area.innerHTML = "";
   if (round.type === "classify") renderClassify(game, round, area);
+  if (round.type === "speed") renderSpeed(round, area);
+  if (round.type === "flash") renderFlash(round, area);
   if (round.type === "select") renderSelect(game, round, area);
   if (round.type === "order") renderOrder(round, area);
 }
@@ -293,6 +330,67 @@ function renderSelect(game, round, area) {
   area.appendChild(grid);
 }
 
+function renderSpeed(round, area) {
+  const wrap = document.createElement("div");
+  wrap.className = "speed-lab";
+  wrap.innerHTML = `<div class="speed-meter"><strong id="speedTimer">${(round.durationMs / 1000).toFixed(1)}s</strong><span>只点安全信号</span></div><div class="speed-grid"></div>`;
+  const grid = wrap.querySelector(".speed-grid");
+  round.options.forEach((text) => {
+    const button = document.createElement("button");
+    button.className = "speed-card";
+    button.innerHTML = `<span>${round.targets.includes(text) ? "SIGNAL" : "NOISE"}</span><strong>${text}</strong>`;
+    button.onclick = () => {
+      if (button.classList.contains("selected") || button.disabled) return;
+      button.classList.add("selected");
+      state.selections.push({ text, reactionMs: Date.now() - state.roundStartedAt });
+    };
+    grid.appendChild(button);
+  });
+  area.appendChild(wrap);
+  const timer = $("speedTimer");
+  const endAt = state.roundStartedAt + round.durationMs;
+  const tick = () => {
+    if (state.stage >= games.length || currentRound() !== round) return;
+    const left = Math.max(0, endAt - Date.now());
+    timer.textContent = `${(left / 1000).toFixed(1)}s`;
+    if (left <= 0) {
+      grid.querySelectorAll("button:not(.selected)").forEach((button) => (button.disabled = true));
+      feedback("时间到。提交看看你的信号捕捉是否准确。", false);
+      return;
+    }
+    setTimeout(tick, 100);
+  };
+  tick();
+}
+
+function renderFlash(round, area) {
+  const wrap = document.createElement("div");
+  wrap.className = "flash-lab";
+  wrap.innerHTML = `
+    <div class="flash-frame" id="flashFrame">
+      <p>证据快照</p>
+      <strong>${round.correct.join(" · ")}</strong>
+    </div>
+    <div class="flash-options hidden" id="flashOptions"></div>
+  `;
+  area.appendChild(wrap);
+  setTimeout(() => {
+    if (state.stage >= games.length || currentRound() !== round) return;
+    state.flashRevealed = true;
+    $("flashFrame").classList.add("hidden");
+    const options = $("flashOptions");
+    options.classList.remove("hidden");
+    round.options.forEach((text) => {
+      const button = document.createElement("button");
+      button.className = "statement-card";
+      button.innerHTML = `<span>记忆证据</span><strong>${text}</strong>`;
+      button.onclick = () => toggleSelection(button, text, 3);
+      options.appendChild(button);
+    });
+    feedback("选择 3 个你确实看到的证据。", true);
+  }, round.revealMs);
+}
+
 function renderOrder(round, area) {
   const layout = document.createElement("div");
   layout.className = "workflow-layout";
@@ -328,6 +426,38 @@ function toggleSelection(button, text, limit) {
   button.classList.add("selected");
 }
 
+function scoreSpeedRound(round, selections) {
+  const picked = selections.map((item) => item.text);
+  const targetHits = picked.filter((item) => round.targets.includes(item)).length;
+  const trapHits = picked.filter((item) => round.traps.includes(item));
+  const fastestAverage = selections
+    .filter((item) => round.targets.includes(item.text))
+    .map((item) => item.reactionMs)
+    .reduce((sum, value, _, list) => sum + value / Math.max(1, list.length), 0);
+  const speedBonus = fastestAverage && fastestAverage < 1200 ? 10 : 0;
+  const missPenalty = (round.targets.length - targetHits) * 20;
+  const trapPenalty = trapHits.length * 35;
+  const score = Math.max(0, Math.min(100, Math.round((targetHits / round.targets.length) * 100 + speedBonus - missPenalty - trapPenalty)));
+  return {
+    score,
+    riskTriggered: trapHits.length > 0,
+    trapHits,
+    evidence: `命中安全信号 ${targetHits}/${round.targets.length}，危险误点 ${trapHits.length} 个，平均反应 ${fastestAverage ? Math.round(fastestAverage) : 0}ms`
+  };
+}
+
+function scoreFlashRound(round, selections) {
+  const correctHits = selections.filter((item) => round.correct.includes(item)).length;
+  const trapHits = selections.filter((item) => round.traps.includes(item));
+  const score = Math.max(0, Math.min(100, Math.round(correctHits * 34 - trapHits.length * 7)));
+  return {
+    score,
+    riskTriggered: trapHits.length > 0,
+    trapHits,
+    evidence: `记住真实证据 ${correctHits}/${round.correct.length}，脑补细节 ${trapHits.length} 个`
+  };
+}
+
 function submitGame() {
   const game = currentGame();
   const round = currentRound();
@@ -348,6 +478,23 @@ function submitGame() {
       const answer = round.cards.find(([cardText]) => cardText === text)?.[1];
       return state.selections.find((item) => item.text === text)?.choice !== answer;
     });
+  } else if (round.type === "speed") {
+    if (!state.selections.length) return feedback("至少点击一个你认为安全的 AI 信号。", false);
+    const result = scoreSpeedRound(round, state.selections);
+    score = result.score;
+    evidence = result.evidence;
+    candidateSelection = state.selections.map((item) => `${item.text} (${item.reactionMs}ms)`);
+    correctAnswer = [...round.targets];
+    criticalMisses = result.trapHits;
+  } else if (round.type === "flash") {
+    if (!state.flashRevealed) return feedback("证据还在闪现，稍等一下再作答。", false);
+    if (state.selections.length < 3) return feedback("请选择 3 个你确实看到的证据。", false);
+    const result = scoreFlashRound(round, state.selections);
+    score = result.score;
+    evidence = result.evidence;
+    candidateSelection = [...state.selections];
+    correctAnswer = [...round.correct];
+    criticalMisses = result.trapHits;
   } else if (round.type === "select") {
     if (state.selections.length < round.limit) return feedback(`请选择 ${round.limit} 项后再提交。`, false);
     const correct = state.selections.filter((item) => round.correct.includes(item)).length;
@@ -394,7 +541,7 @@ function submitGame() {
 }
 
 function advanceGame() {
-  if (state.round < 2) {
+  if (state.round < currentGame().rounds.length - 1) {
     state.round += 1;
     renderGame();
     return;
@@ -431,7 +578,7 @@ function recommendationStatus() {
     return { level: "NO", title: "暂不推荐进入候选池", reason: "高风险任务底线未通过，需要重点验证其 AI 使用边界。" };
   }
   if (m.total >= 85 && m.min >= 70 && m.stability >= 75) {
-    return { level: "YES", title: "强推荐进入候选池", reason: "12 个行为样本表现稳定，四项 AI Sense 能力没有明显短板。" };
+    return { level: "YES", title: "强推荐进入候选池", reason: `${totalRounds()} 个行为样本表现稳定，四项 AI Sense 能力没有明显短板。` };
   }
   if (m.total >= 70 && m.min >= 50 && m.stability >= 55) {
     return { level: "CAUTION", title: "可推荐，建议二面验证", reason: "已经形成 AI Sense 优势，但稳定性或单项能力仍需验证。" };
@@ -611,7 +758,7 @@ function renderResults() {
   const m = metrics();
   $("hudStage").textContent = "已完成";
   $("hudBadge").textContent = badge.name;
-  $("hudProgress").textContent = "4 / 4";
+  $("hudProgress").textContent = `${totalRounds()} / ${totalRounds()}`;
   $("gameBar").style.width = "100%";
   $("finalMedal").textContent = badge.code;
   $("resultTitle").textContent = `我是「${badge.name}」`;
@@ -628,11 +775,11 @@ function renderAdmin() {
   const status = recommendationStatus();
   const career = careerRecommendation();
   const m = metrics();
-  $("adminSource").textContent = "数据来源：候选人在 4 个游戏、12 个短回合中的实际操作，而不是自我评价。";
+  $("adminSource").textContent = `数据来源：候选人在 4 个游戏、${totalRounds()} 个短回合中的实际操作，而不是自我评价。`;
   $("adminVerdict").className = `verdict ${status.level.toLowerCase()}`;
   $("adminVerdict").innerHTML = `<strong>${status.title}</strong><span>${status.reason}</span><em>强推荐线：平均分 ≥ 85，单项 ≥ 70，稳定性 ≥ 75，风险底线通过。</em>`;
   $("metricGrid").innerHTML = Object.entries(state.scores)
-    .map(([key, value]) => `<div><span>${dimensions[key].name}</span><strong>${value}</strong><em>三回合：${state.roundScores[key].join(" / ")}</em></div>`)
+    .map(([key, value]) => `<div><span>${dimensions[key].name}</span><strong>${value}</strong><em>${state.roundScores[key].length} 回合：${state.roundScores[key].join(" / ")}</em></div>`)
     .concat([
       `<div><span>稳定性</span><strong>${m.stability}</strong><em>同类场景表现是否一致</em></div>`,
       `<div><span>风险底线</span><strong>${m.riskPass ? "通过" : "未通过"}</strong><em>${m.riskPass ? "未出现高风险误判" : state.riskFailures.join("；")}</em></div>`,
@@ -649,7 +796,7 @@ function renderAdmin() {
 }
 
 function renderPendingAdmin() {
-  $("adminSource").textContent = "暂无完整记录：请先让候选人在本浏览器完成 4 个游戏、12 个短回合。";
+  $("adminSource").textContent = `暂无完整记录：请先让候选人在本浏览器完成 4 个游戏、${totalRounds()} 个短回合。`;
   $("adminVerdict").className = "verdict caution";
   $("adminVerdict").innerHTML = "<strong>等待候选人完成测试</strong><span>完成后将生成严格筛选结论。</span><em>进度要求：4 / 4 个游戏完成。</em>";
   $("metricGrid").innerHTML = Object.values(dimensions).map((item) => `<div><span>${item.name}</span><strong>待测</strong><em>${item.description}</em></div>`).join("");
