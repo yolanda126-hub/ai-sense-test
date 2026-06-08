@@ -258,7 +258,7 @@ a:focus-visible {
 .internal-only { display: none; }
 body.recruiter-mode .internal-only { display: inline-flex; }
 body.recruiter-mode .internal-only.hidden,
-.hidden { display: none; }
+.hidden { display: none !important; }
 
 .recruiter-top {
   position: fixed;

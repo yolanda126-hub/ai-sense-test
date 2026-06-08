@@ -121,7 +121,7 @@ const games = [
         question: "Flash Evidence：刚刚闪过的证据是什么？",
         instruction: "证据只出现一瞬间。凭记忆选择 3 个你确实看到的信息，不要脑补。",
         type: "flash",
-        revealMs: 1250,
+        revealMs: 750,
         correct: ["上线前做过 A/B 测试", "引用了用户访谈原文", "没有提到模型训练经验"],
         traps: ["负责过大模型训练", "已经证明商业模式跑通"],
         options: [
