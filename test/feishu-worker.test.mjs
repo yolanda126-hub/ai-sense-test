@@ -105,6 +105,12 @@ test("worker uploads a resume and attaches it to the existing candidate record",
       assert.equal(options.body instanceof FormData, true);
       return Response.json({ code: 0, data: { file_token: "file-token-1" } });
     }
+    if (String(url).endsWith("/fields") && options?.method !== "POST") {
+      return Response.json({ code: 0, data: { items: [] } });
+    }
+    if (String(url).endsWith("/fields") && options?.method === "POST") {
+      return Response.json({ code: 0, data: { field: { field_name: "简历附件" } } });
+    }
     return Response.json({ code: 0, data: { record: { record_id: "rec-1" } } });
   };
 
@@ -119,11 +125,14 @@ test("worker uploads a resume and attaches it to the existing candidate record",
       }
     }), env);
     assert.equal(response.status, 200);
-    assert.equal(calls.length, 3);
+    assert.equal(calls.length, 5);
     assert.equal(calls[1].url.includes("/drive/v1/medias/upload_all"), true);
-    assert.equal(calls[2].method, "PUT");
-    assert.equal(calls[2].url.endsWith("/candidate-table/records/rec-1"), true);
-    assert.deepEqual(JSON.parse(calls[2].body).fields["简历附件"], [{ file_token: "file-token-1" }]);
+    assert.equal(calls[2].url.endsWith("/candidate-table/fields"), true);
+    assert.equal(calls[3].method, "POST");
+    assert.deepEqual(JSON.parse(calls[3].body), { field_name: "简历附件", type: 17 });
+    assert.equal(calls[4].method, "PUT");
+    assert.equal(calls[4].url.endsWith("/candidate-table/records/rec-1"), true);
+    assert.deepEqual(JSON.parse(calls[4].body).fields["简历附件"], [{ file_token: "file-token-1" }]);
   } finally {
     globalThis.fetch = originalFetch;
   }

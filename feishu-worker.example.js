@@ -125,6 +125,7 @@ async function handleResumeUpload(resume, env) {
       fileName: resume.fileName,
       mimeType: resume.mimeType || "application/octet-stream"
     });
+    await ensureAttachmentField(token, env.FEISHU_APP_TOKEN, env.FEISHU_CANDIDATE_TABLE_ID);
 
     const updateUrl = `${recordsUrl(env.FEISHU_APP_TOKEN, env.FEISHU_CANDIDATE_TABLE_ID)}/${resume.candidateRecordId}`;
     const updateResponse = await fetch(updateUrl, {
@@ -181,6 +182,31 @@ async function uploadBitableAttachment(token, appToken, file) {
   const fileToken = result.data?.file_token || result.data?.file?.file_token;
   if (!response.ok || result.code || !fileToken) throw new Error("Failed to upload resume attachment");
   return fileToken;
+}
+
+async function ensureAttachmentField(token, appToken, tableId) {
+  const fieldsUrl = `https://open.feishu.cn/open-apis/bitable/v1/apps/${appToken}/tables/${tableId}/fields`;
+  const listResponse = await fetch(fieldsUrl, {
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json; charset=utf-8"
+    }
+  });
+  const listResult = await listResponse.json();
+  if (!listResponse.ok || listResult.code) throw new Error("Failed to list Feishu fields");
+  const fields = listResult.data?.items || [];
+  if (fields.some((field) => field.field_name === "简历附件")) return;
+
+  const createResponse = await fetch(fieldsUrl, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json; charset=utf-8"
+    },
+    body: JSON.stringify({ field_name: "简历附件", type: 17 })
+  });
+  const createResult = await createResponse.json();
+  if (!createResponse.ok || createResult.code) throw new Error("Failed to create resume attachment field");
 }
 
 function base64ToBytes(base64) {
